@@ -1,1 +1,37 @@
+@keyframes snk {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
+/* Drag states */
+.dc  { opacity: .3 !important; transform: scale(0.94) !important; }
+.doc { outline: 2.5px dashed #0054A3 !important; outline-offset: 3px; transform: scale(1.05) !important; }
+.doe { border-color: #0054A3 !important; color: #0054A3 !important; background: #E8F0FE !important; }
+
+/* Scrollbar */
+.ss::-webkit-scrollbar { height: 4px; }
+.ss::-webkit-scrollbar-thumb { background: #C4C6D0; border-radius: 2px; }
+
+* { box-sizing: border-box; }
+
+.dl-panel { animation: fadeIn .18s cubic-bezier(.2, 0, 0, 1); }
+
+/* Mobile: hide label text on small screens */
+@media (max-width: 520px) {
+  .bar-label { display: none !important; }
+  .bar-icon  { font-size: 18px !important; }
+}
+@media (max-width: 400px) {
+  .fab-label { display: none !important; }
+}
+
+/* Touch-drag highlight */
+.touch-drag { opacity: .4; transform: scale(0.95); }
