@@ -10,8 +10,33 @@ import Snack        from './components/Snack.jsx';
 import StyleToggle  from './components/StyleToggle.jsx';
 import ShelfCard    from './components/ShelfCard.jsx';
 import StickerCard  from './components/StickerCard.jsx';
-import ShelfPickDialog from './dialogs/ShelfPickDialog.jsx';
-import CsvDialog       from './dialogs/CsvDialog.jsx';
+import ShelfPickDialog   from './dialogs/ShelfPickDialog.jsx';
+import CsvDialog         from './dialogs/CsvDialog.jsx';
+import TemplatesDialog   from './dialogs/TemplatesDialog.jsx';
+
+/* ── localStorage helpers ───────────────────────────────────── */
+function lsGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function lsSet(key, val) { try { localStorage.setItem(key, val); } catch {} }
+
+/* ── SVG icons (Feather-style, no extra dep) ────────────────── */
+function IcUpload({ s = 16 }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+}
+function IcImage({ s = 16 }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
+}
+function IcChevDown({ s = 14 }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
+}
+function IcLayers({ s = 16 }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>;
+}
+function IcFile({ s = 16 }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>;
+}
+function IcGrid({ s = 16 }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
+}
 
 export default function App() {
   const [products,      setProducts]      = useState(INITIAL);
@@ -35,10 +60,16 @@ export default function App() {
   const [dragShelfCard, setDragShelfCard] = useState(null);
   const [dragOverSlot,  setDragOverSlot]  = useState(null);
   const [dragOverShelf, setDragOverShelf] = useState(false);
+  /* ── new ── */
+  const [templates,     setTemplates]     = useState([]);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [defaultStyle,  setDefaultStyle]  = useState({ theme: 0, filled: false, ellipsis: false });
 
-  const canvasRef      = useRef(null);
-  const savedLoadedRef = useRef(false);
-  const touchDragRef   = useRef(null);
+  const canvasRef           = useRef(null);
+  const savedLoadedRef      = useRef(false);
+  const touchDragRef        = useRef(null);
+  const templatesInitRef    = useRef(false);
+  const defaultStyleInitRef = useRef(false);
 
   const totalPages  = Math.max(1, Math.ceil(products.length / PER_PAGE));
   const pageProds   = products.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
@@ -47,18 +78,50 @@ export default function App() {
   const isDragging  = dragSrcId !== null;
   const activeColor = THEMES[form.theme]?.color || M.primary;
   const canSave     = !!(form.name && form.rom && form.battery && form.price);
+  const isCurrentDefault =
+    form.theme === defaultStyle.theme &&
+    !!form.filled  === !!defaultStyle.filled &&
+    !!form.ellipsis === !!defaultStyle.ellipsis;
 
-  /* ── Shelf persistence ───────────────────────────────────── */
+  /* ── Shelf persistence (window.storage + localStorage fallback) */
   useEffect(() => {
     (async () => {
-      try { const r = await window.storage?.get('pts_saved'); if (r?.value) setSavedCards(JSON.parse(r.value)); } catch {}
+      try {
+        const r = await window.storage?.get('pts_saved');
+        if (r?.value) { setSavedCards(JSON.parse(r.value)); savedLoadedRef.current = true; return; }
+      } catch {}
+      const v = lsGet('pts_saved');
+      if (v) try { setSavedCards(JSON.parse(v)); } catch {}
       savedLoadedRef.current = true;
     })();
   }, []);
   useEffect(() => {
     if (!savedLoadedRef.current) return;
     window.storage?.set('pts_saved', JSON.stringify(savedCards)).catch(() => {});
+    lsSet('pts_saved', JSON.stringify(savedCards));
   }, [savedCards]);
+
+  /* ── Templates persistence (localStorage) ───────────────────── */
+  useEffect(() => {
+    const v = lsGet('pts_templates');
+    if (v) try { setTemplates(JSON.parse(v)); } catch {}
+    templatesInitRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!templatesInitRef.current) return;
+    lsSet('pts_templates', JSON.stringify(templates));
+  }, [templates]);
+
+  /* ── Default card style persistence (localStorage) ──────────── */
+  useEffect(() => {
+    const v = lsGet('pts_default_style');
+    if (v) try { setDefaultStyle(JSON.parse(v)); } catch {}
+    defaultStyleInitRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!defaultStyleInitRef.current) return;
+    lsSet('pts_default_style', JSON.stringify(defaultStyle));
+  }, [defaultStyle]);
 
   /* ── CSS + Google Fonts ──────────────────────────────────── */
   useEffect(() => {
@@ -74,10 +137,16 @@ export default function App() {
 
   /* ── Helpers ─────────────────────────────────────────────── */
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500); }
-  function openAdd() { setForm(EMPTY); setAddToShelf(false); setModal('add'); }
+  function openAdd() {
+    setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis });
+    setAddToShelf(false); setModal('add');
+  }
   function openEmptySlot() {
     if (savedCards.length > 0) { setShelfPickOpen(true); }
-    else { setForm(EMPTY); setAddToShelf(false); setModal('add'); }
+    else {
+      setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis });
+      setAddToShelf(false); setModal('add');
+    }
   }
   function openEdit(p) {
     setForm({ name: p.name, ram: p.ram, rom: p.rom, battery: p.battery, price: p.price, theme: p.theme, filled: !!p.filled, ellipsis: !!p.ellipsis });
@@ -127,6 +196,31 @@ export default function App() {
     const items = rows.map(r => ({ ...r, id: Date.now() + (Math.random() * 10000 | 0) }));
     if (mode === 'replace') { setProducts(items); setPage(0); showToast(`🎉 Imported ${items.length} products`); }
     else { setProducts(prev => { const n = [...prev, ...items]; setPage(Math.ceil(n.length / PER_PAGE) - 1); return n; }); showToast(`📥 Imported ${items.length} products`); }
+  }
+
+  /* ── Template helpers ───────────────────────────────────────── */
+  function saveTemplate(name) {
+    setTemplates(prev => [...prev, {
+      id: Date.now(), name,
+      products: [...products], font, gridCols, paperSize,
+      savedAt: new Date().toISOString(),
+    }]);
+    showToast(`📑 Template "${name}" saved!`);
+  }
+  function loadTemplate(t) {
+    setProducts(t.products.map(p => ({ ...p, id: Date.now() + (Math.random() * 10000 | 0) })));
+    setFont(t.font); setGridCols(t.gridCols); setPaperSize(t.paperSize); setPage(0);
+    showToast(`📑 "${t.name}" loaded!`);
+  }
+  function deleteTemplate(id) {
+    setTemplates(prev => prev.filter(t => t.id !== id));
+    showToast('Template deleted');
+  }
+
+  /* ── Default card style helper ──────────────────────────────── */
+  function applyDefaultStyle() {
+    setDefaultStyle({ theme: form.theme, filled: form.filled, ellipsis: form.ellipsis });
+    showToast('✅ Default card style saved!');
   }
 
   /* ── Drag helpers ────────────────────────────────────────── */
@@ -345,30 +439,46 @@ export default function App() {
         position: 'sticky', top: 0, zIndex: 100,
         background: M.s1, borderBottom: `1px solid ${M.outlineVar}`,
         padding: '0 12px',
-        display: 'flex', alignItems: 'center', gap: 8,
+        display: 'flex', alignItems: 'center', gap: 6,
         height: 56, boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
       }}>
-        <span style={{ fontSize: 20 }}>🏷️</span>
+        <span style={{ fontSize: 20, flexShrink: 0 }}>🏷️</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 500, color: M.onSurface, letterSpacing: 0.2, lineHeight: 1.2 }}>Price Tag Studio</div>
           <div style={{ fontSize: 10, color: M.onSurfaceVar, lineHeight: 1 }}>{products.length} stickers · P{page + 1}/{totalPages}</div>
         </div>
 
+        {/* Templates */}
+        <button onClick={() => setTemplatesOpen(true)} title="Workspace Templates"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '7px 11px', borderRadius: R.full,
+            background: templates.length > 0 ? M.primaryContainer : M.s3,
+            color: templates.length > 0 ? M.primary : M.onSurfaceVar,
+            border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+            whiteSpace: 'nowrap', flexShrink: 0,
+          }}>
+          <IcLayers s={15} />
+          <span className="bar-label">
+            {templates.length > 0 ? `Templates (${templates.length})` : 'Templates'}
+          </span>
+        </button>
+
         {/* Import CSV */}
         <button onClick={() => setCsvOpen(true)} title="Import CSV"
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 12px', borderRadius: R.full,
+            padding: '7px 11px', borderRadius: R.full,
             background: M.secondaryContainer, color: M.onSecondaryContainer,
             border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer',
             whiteSpace: 'nowrap', flexShrink: 0,
           }}>
-          <span className="bar-icon">📥</span>
-          <span className="bar-label">Import CSV</span>
+          <IcUpload s={15} />
+          <span className="bar-label">Import</span>
         </button>
 
         {/* Export PNG */}
-        <button onClick={generateImage} disabled={busy} title="Export PNG"
+        <button onClick={generateImage} disabled={busy} title={`Export PNG ${paper.label}`}
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '7px 12px', borderRadius: R.full,
@@ -378,22 +488,21 @@ export default function App() {
             cursor: busy ? 'not-allowed' : 'pointer',
             whiteSpace: 'nowrap', flexShrink: 0,
           }}>
-          <span className="bar-icon">🖼️</span>
+          <IcImage s={15} />
           <span className="bar-label">{busy ? 'Exporting…' : `PNG ${paper.label}`}</span>
         </button>
 
-        {/* Downloads dropdown */}
+        {/* Downloads dropdown (icon-only toggle) */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button onClick={() => setDlOpen(o => !o)} title="More downloads"
+          <button onClick={() => setDlOpen(o => !o)} title="Download options"
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '7px 12px', borderRadius: R.full,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36, borderRadius: R.full,
               background: dlOpen ? M.primaryContainer : M.s3,
               color: dlOpen ? M.primary : M.onSurfaceVar,
-              border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              border: 'none', cursor: 'pointer', flexShrink: 0,
             }}>
-            <span className="bar-icon">⬇️</span>
-            <span className="bar-label">Downloads</span>
+            <IcChevDown s={16} />
           </button>
 
           {dlOpen && (
@@ -401,17 +510,17 @@ export default function App() {
               position: 'absolute', top: 'calc(100% + 8px)', right: 0,
               background: M.s0, border: `1px solid ${M.outlineVar}`,
               borderRadius: R.lg, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-              minWidth: 200, zIndex: 300, overflow: 'hidden',
+              minWidth: 210, zIndex: 300, overflow: 'hidden',
             }}>
               <div style={{ padding: '10px 14px 6px', fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase' }}>
                 Download Options
               </div>
               {[
-                { icon: '🖼️', label: 'PNG Image',       sub: 'High-res print-ready',     fn: () => { generateImage(); setDlOpen(false); } },
-                { icon: '📄', label: 'PDF Document',    sub: 'Print via browser dialog',  fn: generatePDF },
-                { icon: '📋', label: 'HTML Document',   sub: 'Open in Word / browser',    fn: generateDoc },
-                { icon: '📊', label: 'CSV Spreadsheet', sub: 'All product data rows',     fn: generateCSV },
-              ].map(({ icon, label, sub, fn }) => (
+                { ic: <IcImage s={18} />,  label: 'PNG Image',       sub: 'High-res print-ready',    fn: () => { generateImage(); setDlOpen(false); } },
+                { ic: <IcFile s={18} />,   label: 'PDF Document',    sub: 'Print via browser dialog', fn: generatePDF },
+                { ic: <IcFile s={18} />,   label: 'HTML Document',   sub: 'Open in Word / browser',   fn: generateDoc },
+                { ic: <IcGrid s={18} />,   label: 'CSV Spreadsheet', sub: 'All product data rows',    fn: generateCSV },
+              ].map(({ ic, label, sub, fn }) => (
                 <button key={label} onClick={fn}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12, width: '100%',
@@ -421,7 +530,7 @@ export default function App() {
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = M.s2}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
+                  <span style={{ color: M.primary, display: 'flex', flexShrink: 0 }}>{ic}</span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: M.onSurface }}>{label}</div>
                     <div style={{ fontSize: 11, color: M.onSurfaceVar }}>{sub}</div>
@@ -622,13 +731,25 @@ export default function App() {
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       <Snack msg={toast} />
       <CsvDialog open={csvOpen} onClose={() => setCsvOpen(false)} onImport={handleCsvImport} />
+      <TemplatesDialog
+        open={templatesOpen}
+        onClose={() => setTemplatesOpen(false)}
+        templates={templates}
+        onSave={saveTemplate}
+        onLoad={loadTemplate}
+        onDelete={deleteTemplate}
+        font={font}
+      />
       <ShelfPickDialog
         open={shelfPickOpen}
         onClose={() => setShelfPickOpen(false)}
         savedCards={savedCards}
         font={font}
         onPickShelf={sc => { addSavedToGrid(sc); }}
-        onNewCreate={() => { setForm(EMPTY); setAddToShelf(false); setModal('add'); }}
+        onNewCreate={() => {
+          setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis });
+          setAddToShelf(false); setModal('add');
+        }}
         onRemoveShelf={removeSavedCard}
       />
 
@@ -673,9 +794,29 @@ export default function App() {
             </div>
 
             {/* Style toggle */}
-            <div style={{ marginBottom: 14 }}>
+            <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Style</div>
               <StyleToggle value={form.filled} onChange={v => setForm(f => ({ ...f, filled: v }))} color={activeColor} />
+            </div>
+
+            {/* Save Self Card — set as default style */}
+            <div style={{
+              marginBottom: 14, padding: '9px 12px', borderRadius: R.md,
+              background: isCurrentDefault ? `${M.primary}0A` : M.s2,
+              border: `1px solid ${isCurrentDefault ? M.primary + '55' : M.outlineVar}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+              transition: 'all .2s',
+            }}>
+              <div style={{ fontSize: 11, color: isCurrentDefault ? M.primary : M.onSurfaceVar, fontWeight: isCurrentDefault ? 600 : 400 }}>
+                {isCurrentDefault ? '✓ This is your default card style' : 'Save color & style as default for new cards'}
+              </div>
+              {!isCurrentDefault && (
+                <button onClick={applyDefaultStyle} style={{
+                  padding: '5px 12px', borderRadius: R.full, flexShrink: 0,
+                  background: M.s3, color: M.onSurfaceVar,
+                  border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}>Set Default</button>
+              )}
             </div>
 
             {/* One-line name */}
