@@ -2,8 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { M, R, THEMES, FONTS, GRID_OPTIONS, PAPER_SIZES, INITIAL, EMPTY, PER_PAGE } from './lib/constants.js';
 import { rrect, drawSticker } from './lib/canvas.js';
 import Btn          from './components/Btn.jsx';
-import Chip         from './components/Chip.jsx';
-import SegBtn       from './components/SegBtn.jsx';
 import Switch       from './components/Switch.jsx';
 import Field        from './components/Field.jsx';
 import Snack        from './components/Snack.jsx';
@@ -441,7 +439,7 @@ export default function App() {
 
   /* ── Render ──────────────────────────────────────────────── */
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #F0F2FF 0%, #F5F3FF 50%, #EEF2FF 100%)', fontFamily: `'${font}',sans-serif` }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #F7F7F7 0%, #F2F2F2 50%, #F5F5F5 100%)', fontFamily: `'${font}',sans-serif` }}>
 
       {/* ── Top App Bar ── */}
       <div style={{
@@ -646,74 +644,59 @@ export default function App() {
         </div>
 
         {/* ── Controls Panel ── */}
-        <div style={{ background: '#fff', borderRadius: 20, padding: '20px 20px 16px', marginBottom: 16, border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowMd }}>
+        <div style={{ background: '#fff', borderRadius: 20, padding: '18px 20px', marginBottom: 16, border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowMd }}>
 
-          {/* Font */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <div className="accent-bar" />
-              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase' }}>Font Style</div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <div className="ss" style={{ flex: 1, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, minWidth: 0 }}>
-                {FONTS.map(f => <Chip key={f.name} label={f.name} selected={font === f.name} onClick={() => setFont(f.name)} />)}
-              </div>
-              <select value={font} onChange={e => setFont(e.target.value)}
-                style={{
-                  flexShrink: 0, padding: '7px 12px', borderRadius: 10,
-                  border: `1.5px solid ${M.outlineVar}`, background: '#fff',
-                  color: M.onSurface, fontSize: 13, cursor: 'pointer', outline: 'none',
-                  fontFamily: `'${font}', sans-serif`, fontWeight: 500,
-                }}>
+          {/* Row 1: Font | Columns | Paper */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 140px', gap: 12, marginBottom: 14 }}>
+
+            {/* Font dropdown */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Font</div>
+              <select className="ctrl-select" value={font} onChange={e => setFont(e.target.value)}
+                style={{ fontFamily: `'${font}', sans-serif` }}>
                 {FONTS.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+              </select>
+            </div>
+
+            {/* Columns dropdown */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Columns</div>
+              <select className="ctrl-select" value={gridCols} onChange={e => setGridCols(Number(e.target.value))}>
+                {GRID_OPTIONS.map(n => <option key={n} value={n}>{n} col</option>)}
+              </select>
+            </div>
+
+            {/* Paper dropdown */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
+                Paper <span style={{ color: M.error, fontSize: 9, fontWeight: 400, textTransform: 'none', marginLeft: 3 }}>PNG</span>
+              </div>
+              <select className="ctrl-select" value={paperSize} onChange={e => setPaperSize(e.target.value)}>
+                {PAPER_SIZES.map(s => <option key={s.id} value={s.id}>{s.label} — {s.desc}</option>)}
               </select>
             </div>
           </div>
 
-          <div style={{ height: 1, background: M.outlineVar, margin: '0 -4px 16px' }} />
-
-          {/* Columns + Paper */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 20, alignItems: 'start', marginBottom: 16 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div className="accent-bar" />
-                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase' }}>Columns</div>
-              </div>
-              <SegBtn options={GRID_OPTIONS} value={gridCols} onChange={setGridCols} />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div className="accent-bar" />
-                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase' }}>
-                  Paper <span style={{ color: M.error, textTransform: 'none', fontSize: 10, fontWeight: 400, marginLeft: 4 }}>PNG Export</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {PAPER_SIZES.map(s => <Chip key={s.id} label={s.label} selected={paperSize === s.id} onClick={() => setPaperSize(s.id)} />)}
-              </div>
-            </div>
-          </div>
-
-          {/* Paper info + Clear */}
+          {/* Row 2: Paper info badge + Clear */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{
-              padding: '8px 14px', borderRadius: 12,
-              background: M.gradientSubtle, border: `1px solid ${M.outlineVar}`,
+              padding: '7px 12px', borderRadius: 10,
+              background: M.s2, border: `1px solid ${M.outlineVar}`,
               display: 'flex', alignItems: 'center', gap: 10,
             }}>
-              <div style={{ width: Math.round(24 * (paper.w / paper.h)), height: 24, border: `2px solid ${M.primary}`, borderRadius: 3, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: Math.round(22 * (paper.w / paper.h)), height: 22, border: `1.5px solid ${M.primary}`, borderRadius: 2, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'center' }}>
                   {[0, 1, 2].slice(0, gridCols === 3 ? 3 : 2).map((_, i) => (
                     <div key={i} style={{ display: 'flex', gap: 1.5 }}>
                       {Array.from({ length: gridCols }).map((_, j) => (
-                        <div key={j} style={{ width: 2.5, height: 2.5, background: M.primary, borderRadius: 0.5, opacity: .7 }} />
+                        <div key={j} style={{ width: 2.5, height: 2.5, background: M.primary, borderRadius: 0.5, opacity: .6 }} />
                       ))}
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, color: M.primary, fontWeight: 700 }}>{paper.label} · {paper.w}×{paper.h}px</div>
+                <div style={{ fontSize: 12, color: M.onSurface, fontWeight: 700 }}>{paper.label} · {paper.w}×{paper.h}px</div>
                 <div style={{ fontSize: 10, color: M.onSurfaceVar }}>200 DPI · {paper.desc}</div>
               </div>
             </div>
@@ -726,9 +709,9 @@ export default function App() {
           <div style={{
             textAlign: 'center', fontSize: 12, fontWeight: 600, marginBottom: 14,
             padding: '10px 16px', borderRadius: 12,
-            background: dragSrcType === 'shelf' ? 'rgba(139,92,246,0.07)' : 'rgba(99,102,241,0.07)',
-            color:      dragSrcType === 'shelf' ? M.secondary : M.primary,
-            border: `1px solid ${dragSrcType === 'shelf' ? 'rgba(139,92,246,0.2)' : 'rgba(99,102,241,0.2)'}`,
+            background: 'rgba(0,0,0,0.04)',
+            color: M.onSurface,
+            border: `1px solid ${M.outlineVar}`,
           }}>
             {dragSrcType === 'shelf'
               ? '⭐ Drop onto any slot — card goes to top of grid'
@@ -748,7 +731,7 @@ export default function App() {
         )}
 
         {/* ── Sticker Grid ── */}
-        <div style={{ background: 'rgba(99,102,241,0.03)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: '0 2px 12px rgba(99,102,241,0.04)' }}>
+        <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowSm }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
             {pageProds.map(p => (
               <StickerCard key={p.id} p={p} font={font}
@@ -768,13 +751,13 @@ export default function App() {
                 onDrop={handleDropOnEmpty}
                 className={dragOverSlot === `e-${i}` ? 'doe' : ''}
                 style={{
-                  border: `2px dashed rgba(99,102,241,0.2)`, borderRadius: 14, minHeight: 96,
+                  border: `2px dashed rgba(0,0,0,0.14)`, borderRadius: 14, minHeight: 96,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  color: 'rgba(99,102,241,0.3)', fontSize: 22, cursor: 'pointer', transition: 'all .15s', gap: 4,
-                  background: 'rgba(99,102,241,0.01)',
+                  color: 'rgba(0,0,0,0.2)', fontSize: 22, cursor: 'pointer', transition: 'all .15s', gap: 4,
+                  background: 'transparent',
                 }}
-                onMouseEnter={e => { if (!isDragging) { e.currentTarget.style.borderColor = M.primary; e.currentTarget.style.color = M.primary; e.currentTarget.style.background = 'rgba(99,102,241,0.04)'; } }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)'; e.currentTarget.style.color = 'rgba(99,102,241,0.3)'; e.currentTarget.style.background = 'rgba(99,102,241,0.01)'; }}>
+                onMouseEnter={e => { if (!isDragging) { e.currentTarget.style.borderColor = M.primary; e.currentTarget.style.color = M.primary; e.currentTarget.style.background = 'rgba(0,0,0,0.02)'; } }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.14)'; e.currentTarget.style.color = 'rgba(0,0,0,0.2)'; e.currentTarget.style.background = 'transparent'; }}>
                 {isDragging ? <span style={{ fontSize: 18 }}>📋</span> : <span style={{ fontSize: 24, fontWeight: 300 }}>+</span>}
                 {isDragging && <span style={{ fontSize: 9, fontWeight: 700, color: M.primary }}>drop here</span>}
               </div>
