@@ -1,37 +1,37 @@
-/* ─── Design Tokens (Dribbble-style Indigo/Violet palette) ─── */
+/* ─── Design Tokens (Black & White / Monochrome) ────────────── */
 export const M = {
-  primary:              '#6366F1',   // Indigo-500
+  primary:              '#111111',
   onPrimary:            '#FFFFFF',
-  primaryContainer:     '#EDE9FE',   // Violet-100
-  onPrimaryContainer:   '#3730A3',   // Indigo-800
-  secondary:            '#8B5CF6',   // Violet-500
+  primaryContainer:     '#F0F0F0',
+  onPrimaryContainer:   '#111111',
+  secondary:            '#444444',
   onSecondary:          '#FFFFFF',
-  secondaryContainer:   '#F5F3FF',   // Violet-50
-  onSecondaryContainer: '#5B21B6',   // Violet-800
-  error:                '#EF4444',   // Red-500
+  secondaryContainer:   '#EBEBEB',
+  onSecondaryContainer: '#111111',
+  error:                '#CC0000',
   onError:              '#FFFFFF',
-  errorContainer:       '#FEE2E2',   // Red-100
-  onErrorContainer:     '#991B1B',   // Red-800
-  surface:              '#F1F2FC',   // Lavender-tinted bg
-  onSurface:            '#1E1B4B',   // Deep navy
-  surfaceVar:           '#E5E7FB',
-  onSurfaceVar:         '#6B7280',   // Gray-500
-  outline:              '#A5B4FC',   // Indigo-300
-  outlineVar:           'rgba(99,102,241,0.14)',
-  inverseSurface:       '#1E1B4B',
-  inverseOnSurface:     '#F1F2FC',
+  errorContainer:       '#FFE8E8',
+  onErrorContainer:     '#8B0000',
+  surface:              '#F7F7F7',
+  onSurface:            '#111111',
+  surfaceVar:           '#E8E8E8',
+  onSurfaceVar:         '#666666',
+  outline:              '#BBBBBB',
+  outlineVar:           'rgba(0,0,0,0.1)',
+  inverseSurface:       '#111111',
+  inverseOnSurface:     '#F7F7F7',
   s0: '#FFFFFF',
-  s1: '#F8F9FF',
-  s2: '#F1F2FC',
-  s3: '#EAEBF8',
-  s4: '#E2E4F8',
+  s1: '#FAFAFA',
+  s2: '#F4F4F4',
+  s3: '#ECECEC',
+  s4: '#E4E4E4',
   /* extended tokens */
-  gradient:        'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-  gradientSubtle:  'linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%)',
-  shadowSm:        '0 1px 4px rgba(0,0,0,0.06)',
-  shadowMd:        '0 4px 20px rgba(99,102,241,0.08), 0 1px 4px rgba(0,0,0,0.04)',
+  gradient:        'linear-gradient(135deg, #1a1a1a 0%, #444444 100%)',
+  gradientSubtle:  'linear-gradient(135deg, #F7F7F7 0%, #F0F0F0 100%)',
+  shadowSm:        '0 1px 4px rgba(0,0,0,0.07)',
+  shadowMd:        '0 4px 20px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04)',
   shadowLg:        '0 12px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
-  shadowGlow:      '0 8px 32px rgba(99,102,241,0.35)',
+  shadowGlow:      '0 8px 28px rgba(0,0,0,0.22)',
 };
 
 export const R = { xs: 4, sm: 8, md: 12, lg: 16, xl: 28, full: 9999 };
