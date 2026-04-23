@@ -624,18 +624,48 @@ export default function App() {
           </div>
 
           {/* Columns + Paper */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, alignItems: 'start', marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>Columns</div>
-              <SegBtn options={GRID_OPTIONS} value={gridCols} onChange={setGridCols} />
+              <select
+                value={gridCols}
+                onChange={e => setGridCols(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  padding: '7px 12px',
+                  borderRadius: R.sm,
+                  border: `1px solid ${M.outline}`,
+                  background: M.s1,
+                  color: M.onSurface,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                {GRID_OPTIONS.map(n => <option key={n} value={n}>{n} Columns</option>)}
+              </select>
             </div>
             <div>
               <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>
                 Paper <span style={{ color: M.error, textTransform: 'none', fontSize: 9, fontWeight: 400 }}>PNG Export</span>
               </div>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {PAPER_SIZES.map(s => <Chip key={s.id} label={s.label} selected={paperSize === s.id} onClick={() => setPaperSize(s.id)} />)}
-              </div>
+              <select
+                value={paperSize}
+                onChange={e => setPaperSize(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '7px 12px',
+                  borderRadius: R.sm,
+                  border: `1px solid ${M.outline}`,
+                  background: M.s1,
+                  color: M.onSurface,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                {PAPER_SIZES.map(s => <option key={s.id} value={s.id}>{s.label} — {s.desc}</option>)}
+              </select>
             </div>
           </div>
 
