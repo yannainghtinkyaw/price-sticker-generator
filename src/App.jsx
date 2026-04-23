@@ -603,8 +603,28 @@ export default function App() {
           {/* Font */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>Font Style</div>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {FONTS.map(f => <Chip key={f.name} label={f.name} selected={font === f.name} onClick={() => setFont(f.name)} />)}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className="ss" style={{ flex: 1, display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4, minWidth: 0 }}>
+                {FONTS.map(f => <Chip key={f.name} label={f.name} selected={font === f.name} onClick={() => setFont(f.name)} />)}
+              </div>
+              <select
+                value={font}
+                onChange={e => setFont(e.target.value)}
+                style={{
+                  flexShrink: 0,
+                  padding: '6px 12px',
+                  borderRadius: R.sm,
+                  border: `1px solid ${M.outline}`,
+                  background: M.s1,
+                  color: M.onSurface,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  outline: 'none',
+                  fontFamily: `'${font}', sans-serif`,
+                }}
+              >
+                {FONTS.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+              </select>
             </div>
           </div>
 
