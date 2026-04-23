@@ -581,68 +581,6 @@ export default function App() {
 
       <div style={{ padding: '20px 16px 100px', maxWidth: 840, margin: '0 auto' }}>
 
-        {/* ── Shelf ── */}
-        <div
-          onDragOver={e  => { if (dragSrcType === 'grid') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragOverShelf(true); } }}
-          onDragEnter={e => { if (dragSrcType === 'grid') { e.preventDefault(); setDragOverShelf(true); } }}
-          onDragLeave={e => { const rc = e.currentTarget.getBoundingClientRect(); if (e.clientX < rc.left || e.clientX > rc.right || e.clientY < rc.top || e.clientY > rc.bottom) setDragOverShelf(false); }}
-          onDrop={handleDropOnShelf}
-          style={{
-            background: dragOverShelf
-              ? 'rgba(99,102,241,0.05)'
-              : (savedCards.length > 0 ? '#fff' : 'transparent'),
-            border: dragOverShelf
-              ? `2px dashed ${M.primary}`
-              : (savedCards.length > 0 ? `1px solid ${M.outlineVar}` : `2px dashed rgba(99,102,241,0.18)`),
-            borderRadius: 20,
-            padding: savedCards.length > 0 || dragOverShelf ? '14px 16px' : '12px 16px',
-            marginBottom: 16,
-            boxShadow: dragOverShelf
-              ? `0 0 0 4px rgba(99,102,241,0.1)`
-              : (savedCards.length > 0 ? M.shadowMd : 'none'),
-            transition: 'all 0.18s',
-          }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: savedCards.length > 0 || dragOverShelf ? 12 : 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {savedCards.length > 0 && (
-                <div style={{
-                  padding: '2px 10px', borderRadius: R.full,
-                  background: M.gradient, color: '#fff',
-                  fontSize: 11, fontWeight: 700,
-                }}>⭐ {savedCards.length}</div>
-              )}
-              <div style={{ fontSize: 12, fontWeight: 700, color: dragOverShelf ? M.primary : (savedCards.length > 0 ? M.onSurface : M.onSurfaceVar) }}>
-                {dragOverShelf ? 'Drop here to save to shelf'
-                  : savedCards.length > 0 ? 'Shelf — tap to add · drag to card'
-                  : 'Shelf empty — drag a card here or use ★'}
-              </div>
-            </div>
-            {savedCards.length > 0 && !dragOverShelf && (
-              <button onClick={() => { setSavedCards([]); showToast('Shelf cleared'); }}
-                style={{ fontSize: 11, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '3px 8px', borderRadius: 6 }}>Clear</button>
-            )}
-          </div>
-          {(savedCards.length > 0 || dragOverShelf) && (
-            <div className="ss" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-              {savedCards.length === 0 && dragOverShelf && (
-                <div style={{ fontSize: 13, color: M.primary, fontWeight: 600, padding: '8px 0' }}>📋 Release to save</div>
-              )}
-              {savedCards.map(s => (
-                <ShelfCard key={s.savedId} s={s} font={font}
-                  onAdd={() => addSavedToGrid(s)}
-                  onRemove={() => removeSavedCard(s.savedId)}
-                  onDragStart={e => handleShelfDragStart(s, e)}
-                  onDragEnd={resetDrag}
-                  isDragging={dragSrcId === s.savedId && dragSrcType === 'shelf'}
-                  isDropTarget={false} />
-              ))}
-              {dragOverShelf && savedCards.length > 0 && (
-                <div style={{ width: 86, flexShrink: 0, border: `2px dashed ${M.primary}`, borderRadius: R.md, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: M.primary }}>⭐</div>
-              )}
-            </div>
-          )}
-        </div>
-
         {/* ── Controls Panel ── */}
         <div style={{ background: '#fff', borderRadius: 20, padding: '18px 20px', marginBottom: 16, border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowMd }}>
 
@@ -702,6 +640,60 @@ export default function App() {
             </div>
             <Btn variant={clearConfirm ? 'error' : 'outlined'} label={clearConfirm ? '⚠️ Confirm?' : '🗑️ Clear All'} onClick={clearAll} style={{ fontSize: 12, padding: '8px 16px' }} />
           </div>
+        </div>
+
+        {/* ── Shelf ── */}
+        <div
+          onDragOver={e  => { if (dragSrcType === 'grid') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragOverShelf(true); } }}
+          onDragEnter={e => { if (dragSrcType === 'grid') { e.preventDefault(); setDragOverShelf(true); } }}
+          onDragLeave={e => { const rc = e.currentTarget.getBoundingClientRect(); if (e.clientX < rc.left || e.clientX > rc.right || e.clientY < rc.top || e.clientY > rc.bottom) setDragOverShelf(false); }}
+          onDrop={handleDropOnShelf}
+          style={{
+            background: dragOverShelf ? 'rgba(0,0,0,0.02)' : (savedCards.length > 0 ? '#fff' : 'transparent'),
+            border: dragOverShelf
+              ? `2px dashed ${M.primary}`
+              : (savedCards.length > 0 ? `1px solid ${M.outlineVar}` : `2px dashed rgba(0,0,0,0.12)`),
+            borderRadius: 20,
+            padding: savedCards.length > 0 || dragOverShelf ? '14px 16px' : '12px 16px',
+            marginBottom: 16,
+            boxShadow: dragOverShelf ? `0 0 0 4px rgba(0,0,0,0.05)` : (savedCards.length > 0 ? M.shadowMd : 'none'),
+            transition: 'all 0.18s',
+          }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: savedCards.length > 0 || dragOverShelf ? 12 : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {savedCards.length > 0 && (
+                <div style={{ padding: '2px 10px', borderRadius: R.full, background: M.gradient, color: '#fff', fontSize: 11, fontWeight: 700 }}>⭐ {savedCards.length}</div>
+              )}
+              <div style={{ fontSize: 12, fontWeight: 700, color: dragOverShelf ? M.primary : (savedCards.length > 0 ? M.onSurface : M.onSurfaceVar) }}>
+                {dragOverShelf ? 'Drop here to save to shelf'
+                  : savedCards.length > 0 ? 'Shelf — tap to add · drag to card'
+                  : 'Shelf empty — drag a card here or use ★'}
+              </div>
+            </div>
+            {savedCards.length > 0 && !dragOverShelf && (
+              <button onClick={() => { setSavedCards([]); showToast('Shelf cleared'); }}
+                style={{ fontSize: 11, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '3px 8px', borderRadius: 6 }}>Clear</button>
+            )}
+          </div>
+          {(savedCards.length > 0 || dragOverShelf) && (
+            <div className="ss" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+              {savedCards.length === 0 && dragOverShelf && (
+                <div style={{ fontSize: 13, color: M.primary, fontWeight: 600, padding: '8px 0' }}>📋 Release to save</div>
+              )}
+              {savedCards.map(s => (
+                <ShelfCard key={s.savedId} s={s} font={font}
+                  onAdd={() => addSavedToGrid(s)}
+                  onRemove={() => removeSavedCard(s.savedId)}
+                  onDragStart={e => handleShelfDragStart(s, e)}
+                  onDragEnd={resetDrag}
+                  isDragging={dragSrcId === s.savedId && dragSrcType === 'shelf'}
+                  isDropTarget={false} />
+              ))}
+              {dragOverShelf && savedCards.length > 0 && (
+                <div style={{ width: 86, flexShrink: 0, border: `2px dashed ${M.primary}`, borderRadius: R.md, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: M.primary }}>⭐</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Drag hint */}
