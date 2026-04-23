@@ -17,22 +17,25 @@ export default function ShelfCard({ s, font, onAdd, onRemove, onDragStart, onDra
       onMouseLeave={() => setHov(false)}
       title={`${s.name} — tap to add`}
       style={{
-        width: 86, flexShrink: 0,
-        border:     isDropTarget ? `2.5px dashed ${c}` : `1.5px solid ${c}44`,
-        borderRadius: R.md,
-        background: isDropTarget ? `${c}18` : (filled ? c : M.s0),
+        width: 90, flexShrink: 0,
+        border:     isDropTarget ? `2px dashed ${c}` : (filled ? 'none' : `1px solid ${c}30`),
+        borderRadius: 12,
+        background: isDropTarget ? `${c}18` : (filled ? `linear-gradient(145deg, ${c}, ${c}CC)` : '#fff'),
         cursor: 'pointer', position: 'relative',
-        opacity:   isDragging ? 0.3 : 1,
+        opacity:   isDragging ? 0.25 : 1,
         transform: isDropTarget
           ? 'scale(1.1) translateY(-4px)'
-          : (hov ? 'scale(1.07) translateY(-2px)' : 'scale(1)'),
-        boxShadow: hov ? `0 6px 20px ${c}40` : '0 1px 4px rgba(0,0,0,0.1)',
-        transition: 'all 0.14s cubic-bezier(.2,0,0,1)',
+          : (hov ? 'scale(1.06) translateY(-3px)' : 'scale(1)'),
+        boxShadow: hov
+          ? `0 8px 24px ${c}45, 0 3px 8px rgba(0,0,0,0.08)`
+          : (filled ? `0 3px 12px ${c}35` : '0 2px 8px rgba(0,0,0,0.07)'),
+        transition: 'all 0.16s cubic-bezier(.2,0,0,1)',
         fontFamily: `'${font}', sans-serif`,
         userSelect: 'none',
+        overflow: 'hidden',
       }}>
       {/* Colour bar at top */}
-      <div style={{ height: 3, background: c, borderRadius: `${R.md}px ${R.md}px 0 0` }} />
+      {!filled && <div style={{ height: 3, background: `linear-gradient(90deg, ${c}, ${c}77)` }} />}
 
       <div style={{ padding: '5px 7px 8px' }}>
         <div style={{

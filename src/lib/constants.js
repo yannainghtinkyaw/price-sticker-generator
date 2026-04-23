@@ -1,30 +1,37 @@
-/* ─── M3 Design Tokens ─────────────────────────────────────── */
+/* ─── Design Tokens (Dribbble-style Indigo/Violet palette) ─── */
 export const M = {
-  primary:              '#0054A3',
+  primary:              '#6366F1',   // Indigo-500
   onPrimary:            '#FFFFFF',
-  primaryContainer:     '#D5E3FF',
-  onPrimaryContainer:   '#001B3D',
-  secondary:            '#575E71',
+  primaryContainer:     '#EDE9FE',   // Violet-100
+  onPrimaryContainer:   '#3730A3',   // Indigo-800
+  secondary:            '#8B5CF6',   // Violet-500
   onSecondary:          '#FFFFFF',
-  secondaryContainer:   '#DBE2F9',
-  onSecondaryContainer: '#131C2C',
-  error:                '#BA1A1A',
+  secondaryContainer:   '#F5F3FF',   // Violet-50
+  onSecondaryContainer: '#5B21B6',   // Violet-800
+  error:                '#EF4444',   // Red-500
   onError:              '#FFFFFF',
-  errorContainer:       '#FFDAD6',
-  onErrorContainer:     '#410002',
-  surface:              '#F9F9FF',
-  onSurface:            '#1A1B1F',
-  surfaceVar:           '#E0E2EE',
-  onSurfaceVar:         '#44464F',
-  outline:              '#74767F',
-  outlineVar:           '#C4C6D0',
-  inverseSurface:       '#2F3036',
-  inverseOnSurface:     '#F2F0F7',
+  errorContainer:       '#FEE2E2',   // Red-100
+  onErrorContainer:     '#991B1B',   // Red-800
+  surface:              '#F1F2FC',   // Lavender-tinted bg
+  onSurface:            '#1E1B4B',   // Deep navy
+  surfaceVar:           '#E5E7FB',
+  onSurfaceVar:         '#6B7280',   // Gray-500
+  outline:              '#A5B4FC',   // Indigo-300
+  outlineVar:           'rgba(99,102,241,0.14)',
+  inverseSurface:       '#1E1B4B',
+  inverseOnSurface:     '#F1F2FC',
   s0: '#FFFFFF',
-  s1: '#F2F2FA',
-  s2: '#ECECF4',
-  s3: '#E6E6EE',
-  s4: '#E1E1E8',
+  s1: '#F8F9FF',
+  s2: '#F1F2FC',
+  s3: '#EAEBF8',
+  s4: '#E2E4F8',
+  /* extended tokens */
+  gradient:        'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+  gradientSubtle:  'linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%)',
+  shadowSm:        '0 1px 4px rgba(0,0,0,0.06)',
+  shadowMd:        '0 4px 20px rgba(99,102,241,0.08), 0 1px 4px rgba(0,0,0,0.04)',
+  shadowLg:        '0 12px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
+  shadowGlow:      '0 8px 32px rgba(99,102,241,0.35)',
 };
 
 export const R = { xs: 4, sm: 8, md: 12, lg: 16, xl: 28, full: 9999 };
