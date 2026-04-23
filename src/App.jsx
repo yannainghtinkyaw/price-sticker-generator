@@ -3,7 +3,6 @@ import { M, R, THEMES, FONTS, GRID_OPTIONS, PAPER_SIZES, INITIAL, EMPTY, PER_PAG
 import { rrect, drawSticker } from './lib/canvas.js';
 import Btn          from './components/Btn.jsx';
 import Chip         from './components/Chip.jsx';
-import SegBtn       from './components/SegBtn.jsx';
 import Switch       from './components/Switch.jsx';
 import Field        from './components/Field.jsx';
 import Snack        from './components/Snack.jsx';
@@ -434,217 +433,103 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: M.surface, fontFamily: `'${font}',sans-serif` }}>
 
-      {/* ── Top App Bar ── */}
+      {/* ── Top App Bar (2 rows) ── */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 100,
         background: M.s1, borderBottom: `1px solid ${M.outlineVar}`,
-        padding: '0 12px',
-        display: 'flex', alignItems: 'center', gap: 6,
-        height: 56, boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
       }}>
-        <span style={{ fontSize: 20, flexShrink: 0 }}>🏷️</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: M.onSurface, letterSpacing: 0.2, lineHeight: 1.2 }}>Price Tag Studio</div>
-          <div style={{ fontSize: 10, color: M.onSurfaceVar, lineHeight: 1 }}>{products.length} stickers · P{page + 1}/{totalPages}</div>
-        </div>
+        {/* Row 1: actions */}
+        <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6, height: 56 }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>🏷️</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 500, color: M.onSurface, letterSpacing: 0.2, lineHeight: 1.2 }}>Price Tag Studio</div>
+            <div style={{ fontSize: 10, color: M.onSurfaceVar, lineHeight: 1 }}>{products.length} stickers · P{page + 1}/{totalPages}</div>
+          </div>
 
-        {/* Templates */}
-        <button onClick={() => setTemplatesOpen(true)} title="Workspace Templates"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 11px', borderRadius: R.full,
-            background: templates.length > 0 ? M.primaryContainer : M.s3,
-            color: templates.length > 0 ? M.primary : M.onSurfaceVar,
-            border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            whiteSpace: 'nowrap', flexShrink: 0,
-          }}>
-          <IcLayers s={15} />
-          <span className="bar-label">
-            {templates.length > 0 ? `Templates (${templates.length})` : 'Templates'}
-          </span>
-        </button>
-
-        {/* Import CSV */}
-        <button onClick={() => setCsvOpen(true)} title="Import CSV"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 11px', borderRadius: R.full,
-            background: M.secondaryContainer, color: M.onSecondaryContainer,
-            border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            whiteSpace: 'nowrap', flexShrink: 0,
-          }}>
-          <IcUpload s={15} />
-          <span className="bar-label">Import</span>
-        </button>
-
-        {/* Export PNG */}
-        <button onClick={generateImage} disabled={busy} title={`Export PNG ${paper.label}`}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 12px', borderRadius: R.full,
-            background: busy ? M.s3 : M.primary,
-            color: busy ? M.onSurfaceVar : M.onPrimary,
-            border: 'none', fontSize: 12, fontWeight: 500,
-            cursor: busy ? 'not-allowed' : 'pointer',
-            whiteSpace: 'nowrap', flexShrink: 0,
-          }}>
-          <IcImage s={15} />
-          <span className="bar-label">{busy ? 'Exporting…' : `PNG ${paper.label}`}</span>
-        </button>
-
-        {/* Downloads dropdown (icon-only toggle) */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button onClick={() => setDlOpen(o => !o)} title="Download options"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 36, height: 36, borderRadius: R.full,
-              background: dlOpen ? M.primaryContainer : M.s3,
-              color: dlOpen ? M.primary : M.onSurfaceVar,
-              border: 'none', cursor: 'pointer', flexShrink: 0,
-            }}>
-            <IcChevDown s={16} />
+          <button onClick={() => setTemplatesOpen(true)} title="Templates"
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 11px', borderRadius: R.full, background: templates.length > 0 ? M.primaryContainer : M.s3, color: templates.length > 0 ? M.primary : M.onSurfaceVar, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <IcLayers s={15} />
+            <span className="bar-label">{templates.length > 0 ? `Templates (${templates.length})` : 'Templates'}</span>
           </button>
 
-          {dlOpen && (
-            <div className="dl-panel" style={{
-              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              background: M.s0, border: `1px solid ${M.outlineVar}`,
-              borderRadius: R.lg, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-              minWidth: 210, zIndex: 300, overflow: 'hidden',
-            }}>
-              <div style={{ padding: '10px 14px 6px', fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase' }}>
-                Download Options
-              </div>
-              {[
-                { ic: <IcImage s={18} />,  label: 'PNG Image',       sub: 'High-res print-ready',    fn: () => { generateImage(); setDlOpen(false); } },
-                { ic: <IcFile s={18} />,   label: 'PDF Document',    sub: 'Print via browser dialog', fn: generatePDF },
-                { ic: <IcFile s={18} />,   label: 'HTML Document',   sub: 'Open in Word / browser',   fn: generateDoc },
-                { ic: <IcGrid s={18} />,   label: 'CSV Spreadsheet', sub: 'All product data rows',    fn: generateCSV },
-              ].map(({ ic, label, sub, fn }) => (
-                <button key={label} onClick={fn}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-                    padding: '10px 14px', border: 'none', background: 'transparent',
-                    cursor: 'pointer', textAlign: 'left',
-                    borderTop: `1px solid ${M.s3}`, transition: 'background .12s', fontFamily: 'inherit',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = M.s2}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <span style={{ color: M.primary, display: 'flex', flexShrink: 0 }}>{ic}</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: M.onSurface }}>{label}</div>
-                    <div style={{ fontSize: 11, color: M.onSurfaceVar }}>{sub}</div>
-                  </div>
-                </button>
-              ))}
-              <div style={{ padding: '8px 14px 10px', borderTop: `1px solid ${M.s3}` }}>
-                <div style={{ fontSize: 11, color: M.onSurfaceVar }}>Page {page + 1} of {totalPages} · {products.length} products</div>
-              </div>
-            </div>
-          )}
+          <button onClick={() => setCsvOpen(true)} title="Import CSV"
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 11px', borderRadius: R.full, background: M.secondaryContainer, color: M.onSecondaryContainer, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <IcUpload s={15} />
+            <span className="bar-label">Import</span>
+          </button>
+
+          <button onClick={generateImage} disabled={busy} title={`Export PNG ${paper.label}`}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: R.full, background: busy ? M.s3 : M.primary, color: busy ? M.onSurfaceVar : M.onPrimary, border: 'none', fontSize: 12, fontWeight: 500, cursor: busy ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <IcImage s={15} />
+            <span className="bar-label">{busy ? 'Exporting…' : `PNG ${paper.label}`}</span>
+          </button>
+
+          <button onClick={() => setDlOpen(o => !o)} title="Download options"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: R.full, background: dlOpen ? M.primaryContainer : M.s3, color: dlOpen ? M.primary : M.onSurfaceVar, border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+            <IcChevDown s={16} />
+          </button>
+        </div>
+
+        {/* Row 2: font scroll + cols/paper dropdowns */}
+        <div style={{ padding: '0 10px 0 8px', display: 'flex', alignItems: 'center', gap: 6, height: 40, borderTop: `1px solid ${M.outlineVar}` }}>
+          <div className="ss" style={{ flex: 1, display: 'flex', gap: 5, overflowX: 'auto', flexWrap: 'nowrap', alignItems: 'center' }}>
+            {FONTS.map(f => <Chip key={f.name} label={f.name} selected={font === f.name} onClick={() => setFont(f.name)} />)}
+          </div>
+          <select value={gridCols} onChange={e => setGridCols(Number(e.target.value))}
+            style={{ padding: '5px 8px', borderRadius: R.sm, border: `1px solid ${M.outlineVar}`, background: M.s0, color: M.onSurface, fontSize: 12, fontWeight: 500, cursor: 'pointer', outline: 'none', fontFamily: 'inherit', flexShrink: 0 }}>
+            {GRID_OPTIONS.map(n => <option key={n} value={n}>{n} cols</option>)}
+          </select>
+          <select value={paperSize} onChange={e => setPaperSize(e.target.value)}
+            style={{ padding: '5px 8px', borderRadius: R.sm, border: `1px solid ${M.outlineVar}`, background: M.s0, color: M.onSurface, fontSize: 12, fontWeight: 500, cursor: 'pointer', outline: 'none', fontFamily: 'inherit', flexShrink: 0 }}>
+            {PAPER_SIZES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
         </div>
       </div>
 
-      {/* Close download panel on outside click */}
-      {dlOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 200 }} onClick={() => setDlOpen(false)} />}
+      {/* Download panel + backdrop — rendered at root level (escapes top-bar stacking context) */}
+      {dlOpen && <>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 250 }} onClick={() => setDlOpen(false)} />
+        <div className="dl-panel" style={{
+          position: 'fixed', top: 97, right: 8,
+          background: M.s0, border: `1px solid ${M.outlineVar}`,
+          borderRadius: R.lg, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+          minWidth: 210, zIndex: 301, overflow: 'hidden',
+        }}>
+          <div style={{ padding: '10px 14px 6px', fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase' }}>
+            Download Options
+          </div>
+          {[
+            { ic: <IcImage s={18} />, label: 'PNG Image',       sub: 'High-res print-ready',     fn: generateImage },
+            { ic: <IcFile s={18} />,  label: 'PDF Document',    sub: 'Print via browser dialog',  fn: generatePDF   },
+            { ic: <IcFile s={18} />,  label: 'HTML Document',   sub: 'Open in Word / browser',    fn: generateDoc   },
+            { ic: <IcGrid s={18} />,  label: 'CSV Spreadsheet', sub: 'All product data rows',     fn: generateCSV   },
+          ].map(({ ic, label, sub, fn }) => (
+            <button key={label} onClick={() => { setDlOpen(false); fn(); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', borderTop: `1px solid ${M.s3}`, transition: 'background .12s', fontFamily: 'inherit' }}
+              onMouseEnter={e => e.currentTarget.style.background = M.s2}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ color: M.primary, display: 'flex', flexShrink: 0 }}>{ic}</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: M.onSurface }}>{label}</div>
+                <div style={{ fontSize: 11, color: M.onSurfaceVar }}>{sub}</div>
+              </div>
+            </button>
+          ))}
+          <div style={{ padding: '8px 14px 10px', borderTop: `1px solid ${M.s3}` }}>
+            <div style={{ fontSize: 11, color: M.onSurfaceVar }}>Page {page + 1} of {totalPages} · {products.length} products</div>
+          </div>
+        </div>
+      </>}
 
       <div style={{ padding: '14px 14px 100px', maxWidth: 780, margin: '0 auto' }}>
 
-        {/* ── Shelf ── */}
-        <div
-          onDragOver={e  => { if (dragSrcType === 'grid') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragOverShelf(true); } }}
-          onDragEnter={e => { if (dragSrcType === 'grid') { e.preventDefault(); setDragOverShelf(true); } }}
-          onDragLeave={e => { const rc = e.currentTarget.getBoundingClientRect(); if (e.clientX < rc.left || e.clientX > rc.right || e.clientY < rc.top || e.clientY > rc.bottom) setDragOverShelf(false); }}
-          onDrop={handleDropOnShelf}
-          style={{
-            background: dragOverShelf ? `${M.primary}0E` : (savedCards.length > 0 ? M.s1 : 'transparent'),
-            border: dragOverShelf
-              ? `2px dashed ${M.primary}`
-              : (savedCards.length > 0 ? `1px solid ${M.outlineVar}` : `1.5px dashed ${M.outlineVar}`),
-            borderRadius: R.lg,
-            padding: savedCards.length > 0 || dragOverShelf ? '11px 14px' : '9px 14px',
-            marginBottom: 12,
-            boxShadow: dragOverShelf ? `0 0 0 4px ${M.primary}18` : 'none',
-            transition: 'all 0.18s',
-          }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: savedCards.length > 0 || dragOverShelf ? 10 : 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: dragOverShelf ? M.primary : M.onSurfaceVar }}>
-              {dragOverShelf ? '⭐ Drop here to save' : savedCards.length > 0 ? `⭐ Shelf (${savedCards.length}) — tap to add · drag to card` : '⭐ Shelf empty — use ★ button or drag a card here'}
-            </div>
-            {savedCards.length > 0 && !dragOverShelf && (
-              <button onClick={() => { setSavedCards([]); showToast('Shelf cleared'); }}
-                style={{ fontSize: 11, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: '2px 6px', borderRadius: R.xs }}>Clear</button>
-            )}
+        {/* ── Info strip ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: M.onSurfaceVar }}>
+            {paper.label} · {paper.w}×{paper.h}px · 200 DPI · {paper.desc}
           </div>
-          {(savedCards.length > 0 || dragOverShelf) && (
-            <div className="ss" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-              {savedCards.length === 0 && dragOverShelf && (
-                <div style={{ fontSize: 13, color: M.primary, fontWeight: 600, padding: '8px 0' }}>📋 Release to save</div>
-              )}
-              {savedCards.map(s => (
-                <ShelfCard key={s.savedId} s={s} font={font}
-                  onAdd={() => addSavedToGrid(s)}
-                  onRemove={() => removeSavedCard(s.savedId)}
-                  onDragStart={e => handleShelfDragStart(s, e)}
-                  onDragEnd={resetDrag}
-                  isDragging={dragSrcId === s.savedId && dragSrcType === 'shelf'}
-                  isDropTarget={false} />
-              ))}
-              {dragOverShelf && savedCards.length > 0 && (
-                <div style={{ width: 86, flexShrink: 0, border: `2px dashed ${M.primary}`, borderRadius: R.md, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: M.primary }}>⭐</div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Controls Panel ── */}
-        <div style={{ background: M.s1, borderRadius: R.lg, padding: '14px 16px', marginBottom: 14, border: `1px solid ${M.outlineVar}` }}>
-
-          {/* Font */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>Font Style</div>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {FONTS.map(f => <Chip key={f.name} label={f.name} selected={font === f.name} onClick={() => setFont(f.name)} />)}
-            </div>
-          </div>
-
-          {/* Columns + Paper */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, alignItems: 'start', marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>Columns</div>
-              <SegBtn options={GRID_OPTIONS} value={gridCols} onChange={setGridCols} />
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>
-                Paper <span style={{ color: M.error, textTransform: 'none', fontSize: 9, fontWeight: 400 }}>PNG Export</span>
-              </div>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {PAPER_SIZES.map(s => <Chip key={s.id} label={s.label} selected={paperSize === s.id} onClick={() => setPaperSize(s.id)} />)}
-              </div>
-            </div>
-          </div>
-
-          {/* Paper info + Clear */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ padding: '6px 12px', borderRadius: R.sm, background: M.s2, border: `1px solid ${M.outlineVar}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: Math.round(22 * (paper.w / paper.h)), height: 22, border: `1.5px solid ${M.primary}`, borderRadius: 2, background: M.s0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
-                  {[0, 1, 2].slice(0, gridCols === 3 ? 3 : 2).map((_, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 1 }}>
-                      {Array.from({ length: gridCols }).map((_, j) => (
-                        <div key={j} style={{ width: 2, height: 2, background: M.primary, borderRadius: 0.5, opacity: .8 }} />
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: M.primary, fontWeight: 700 }}>{paper.label} · {paper.w}×{paper.h}px</div>
-                <div style={{ fontSize: 10, color: M.onSurfaceVar }}>200 DPI · {paper.desc}</div>
-              </div>
-            </div>
-            <Btn variant={clearConfirm ? 'error' : 'outlined'} label={clearConfirm ? '⚠️ Confirm?' : '🗑️ Clear All'} onClick={clearAll} style={{ fontSize: 12, padding: '7px 14px' }} />
-          </div>
+          <Btn variant={clearConfirm ? 'error' : 'outlined'} label={clearConfirm ? '⚠️ Confirm?' : 'Clear All'} onClick={clearAll} style={{ fontSize: 11, padding: '5px 12px' }} />
         </div>
 
         {/* Drag hint */}
@@ -672,6 +557,51 @@ export default function App() {
               style={{ padding: '6px 18px', borderRadius: R.full, border: `1px solid ${M.outline}`, background: 'transparent', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: M.primary, opacity: page >= totalPages - 1 ? .35 : 1, fontFamily: 'inherit', transition: 'opacity .15s' }}>▶</button>
           </div>
         )}
+
+        {/* ── Shelf (above grid) ── */}
+        <div
+          onDragOver={e  => { if (dragSrcType === 'grid') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragOverShelf(true); } }}
+          onDragEnter={e => { if (dragSrcType === 'grid') { e.preventDefault(); setDragOverShelf(true); } }}
+          onDragLeave={e => { const rc = e.currentTarget.getBoundingClientRect(); if (e.clientX < rc.left || e.clientX > rc.right || e.clientY < rc.top || e.clientY > rc.bottom) setDragOverShelf(false); }}
+          onDrop={handleDropOnShelf}
+          style={{
+            background: dragOverShelf ? `${M.primary}0E` : (savedCards.length > 0 ? M.s1 : 'transparent'),
+            border: dragOverShelf ? `2px dashed ${M.primary}` : (savedCards.length > 0 ? `1px solid ${M.outlineVar}` : `1.5px dashed ${M.outlineVar}`),
+            borderRadius: R.lg,
+            padding: savedCards.length > 0 || dragOverShelf ? '10px 14px' : '8px 14px',
+            marginBottom: 10,
+            boxShadow: dragOverShelf ? `0 0 0 4px ${M.primary}18` : 'none',
+            transition: 'all 0.18s',
+          }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: savedCards.length > 0 || dragOverShelf ? 8 : 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: dragOverShelf ? M.primary : M.onSurfaceVar }}>
+              {dragOverShelf ? '⭐ Drop here to save' : savedCards.length > 0 ? `⭐ Shelf (${savedCards.length}) — tap to add · drag to card` : '⭐ Shelf empty — drag a card here or use ★'}
+            </div>
+            {savedCards.length > 0 && !dragOverShelf && (
+              <button onClick={() => { setSavedCards([]); showToast('Shelf cleared'); }}
+                style={{ fontSize: 11, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: '2px 6px', borderRadius: R.xs }}>Clear</button>
+            )}
+          </div>
+          {(savedCards.length > 0 || dragOverShelf) && (
+            <div className="ss" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+              {savedCards.length === 0 && dragOverShelf && (
+                <div style={{ fontSize: 13, color: M.primary, fontWeight: 600, padding: '8px 0' }}>📋 Release to save</div>
+              )}
+              {savedCards.map(s => (
+                <ShelfCard key={s.savedId} s={s} font={font}
+                  onAdd={() => addSavedToGrid(s)}
+                  onRemove={() => removeSavedCard(s.savedId)}
+                  onDragStart={e => handleShelfDragStart(s, e)}
+                  onDragEnd={resetDrag}
+                  isDragging={dragSrcId === s.savedId && dragSrcType === 'shelf'}
+                  isDropTarget={false} />
+              ))}
+              {dragOverShelf && savedCards.length > 0 && (
+                <div style={{ width: 86, flexShrink: 0, border: `2px dashed ${M.primary}`, borderRadius: R.md, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: M.primary }}>⭐</div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* ── Sticker Grid ── */}
         <div style={{ background: M.s1, borderRadius: R.lg, padding: '14px 12px', border: `1px solid ${M.outlineVar}` }}>
