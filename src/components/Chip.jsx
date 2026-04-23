@@ -11,13 +11,14 @@ export default function Chip({ label, selected, onClick, color }) {
       onMouseLeave={() => setHov(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '6px 14px', borderRadius: R.sm,
-        border:      selected ? 'none' : `1px solid ${M.outline}`,
-        background:  selected ? (color || M.secondaryContainer) : (hov ? M.s3 : 'transparent'),
-        color:       selected ? (color ? '#fff' : M.onSecondaryContainer) : M.onSurfaceVar,
-        fontSize: 13, fontWeight: selected ? 600 : 400,
+        padding: '6px 14px', borderRadius: R.full,
+        border:      selected ? 'none' : `1px solid ${M.outlineVar}`,
+        background:  selected ? (color || M.gradient) : (hov ? M.s3 : M.s1),
+        color:       selected ? '#fff' : M.onSurfaceVar,
+        fontSize: 12, fontWeight: selected ? 700 : 500,
         cursor: 'pointer', position: 'relative', overflow: 'hidden',
         transition: 'all 0.13s', userSelect: 'none', whiteSpace: 'nowrap',
+        boxShadow: selected ? '0 2px 8px rgba(99,102,241,0.3)' : 'none',
       }}>
       {hov && (
         <div style={{

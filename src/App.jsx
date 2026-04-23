@@ -244,7 +244,13 @@ export default function App() {
   }
   function handleDropOnEmpty(e) {
     e.preventDefault(); setDragOverSlot(null);
-    if (dragSrcType === 'shelf') { if (!dragShelfCard) { resetDrag(); return; } addSavedToGrid(dragShelfCard); resetDrag(); return; }
+    if (dragSrcType === 'shelf') {
+      if (!dragShelfCard) { resetDrag(); return; }
+      const clone = { ...dragShelfCard, id: Date.now() }; delete clone.savedId;
+      setProducts(prev => [clone, ...prev]);
+      setPage(0);
+      resetDrag(); showToast('📋 Added to top!'); return;
+    }
     if (!dragSrcId) { resetDrag(); return; }
     const src = products.find(p => p.id === dragSrcId);
     if (!src) { resetDrag(); return; }
@@ -291,8 +297,11 @@ export default function App() {
           if (src) { setProducts(prev => { const idx = prev.findIndex(p => p.id === targetId); const n = [...prev]; n.splice(idx, 0, { ...src, id: Date.now() }); return n; }); showToast('📋 Duplicated!'); }
         }
       } else if (empty) {
-        if (dr.type === 'shelf' && dr.shelfCard) { addSavedToGrid(dr.shelfCard); }
-        else { const src = products.find(p => p.id === dr.id); if (src) { setProducts(prev => [...prev, { ...src, id: Date.now() }]); showToast('📋 Duplicated!'); } }
+        if (dr.type === 'shelf' && dr.shelfCard) {
+          const clone = { ...dr.shelfCard, id: Date.now() }; delete clone.savedId;
+          setProducts(prev => [clone, ...prev]);
+          setPage(0); showToast('📋 Added to top!');
+        } else { const src = products.find(p => p.id === dr.id); if (src) { setProducts(prev => [...prev, { ...src, id: Date.now() }]); showToast('📋 Duplicated!'); } }
       }
     }
     resetDrag();
@@ -432,33 +441,48 @@ export default function App() {
 
   /* ── Render ──────────────────────────────────────────────── */
   return (
-    <div style={{ minHeight: '100vh', background: M.surface, fontFamily: `'${font}',sans-serif` }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #F0F2FF 0%, #F5F3FF 50%, #EEF2FF 100%)', fontFamily: `'${font}',sans-serif` }}>
 
       {/* ── Top App Bar ── */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 100,
-        background: M.s1, borderBottom: `1px solid ${M.outlineVar}`,
-        padding: '0 12px',
-        display: 'flex', alignItems: 'center', gap: 6,
-        height: 56, boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
+        background: 'rgba(255,255,255,0.88)',
+        backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+        borderBottom: '1px solid rgba(99,102,241,0.1)',
+        padding: '0 20px',
+        display: 'flex', alignItems: 'center', gap: 8,
+        height: 64, boxShadow: '0 1px 24px rgba(99,102,241,0.08)',
       }}>
-        <span style={{ fontSize: 20, flexShrink: 0 }}>🏷️</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: M.onSurface, letterSpacing: 0.2, lineHeight: 1.2 }}>Price Tag Studio</div>
-          <div style={{ fontSize: 10, color: M.onSurfaceVar, lineHeight: 1 }}>{products.length} stickers · P{page + 1}/{totalPages}</div>
+        {/* Logo */}
+        <div style={{
+          width: 40, height: 40, flexShrink: 0,
+          background: M.gradient, borderRadius: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: M.shadowGlow,
+        }}>
+          <span style={{ fontSize: 20 }}>🏷️</span>
         </div>
+        <div style={{ marginRight: 4 }}>
+          <div className="grad-text" style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.2, letterSpacing: -0.4 }}>Price Tag Studio</div>
+          <div style={{ fontSize: 10, color: M.onSurfaceVar, lineHeight: 1, fontWeight: 500 }}>
+            {products.length} stickers · P{page + 1}/{totalPages}
+          </div>
+        </div>
+
+        <div style={{ flex: 1 }} />
 
         {/* Templates */}
         <button onClick={() => setTemplatesOpen(true)} title="Workspace Templates"
           style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 11px', borderRadius: R.full,
-            background: templates.length > 0 ? M.primaryContainer : M.s3,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px', borderRadius: R.full,
+            background: templates.length > 0 ? M.primaryContainer : 'rgba(0,0,0,0.04)',
             color: templates.length > 0 ? M.primary : M.onSurfaceVar,
-            border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            whiteSpace: 'nowrap', flexShrink: 0,
+            border: templates.length > 0 ? `1px solid ${M.outlineVar}` : '1px solid transparent',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            whiteSpace: 'nowrap', flexShrink: 0, transition: 'all .15s',
           }}>
-          <IcLayers s={15} />
+          <IcLayers s={14} />
           <span className="bar-label">
             {templates.length > 0 ? `Templates (${templates.length})` : 'Templates'}
           </span>
@@ -467,40 +491,46 @@ export default function App() {
         {/* Import CSV */}
         <button onClick={() => setCsvOpen(true)} title="Import CSV"
           style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 11px', borderRadius: R.full,
-            background: M.secondaryContainer, color: M.onSecondaryContainer,
-            border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            whiteSpace: 'nowrap', flexShrink: 0,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px', borderRadius: R.full,
+            background: 'rgba(0,0,0,0.04)', color: M.onSurfaceVar,
+            border: '1px solid transparent',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            whiteSpace: 'nowrap', flexShrink: 0, transition: 'all .15s',
           }}>
-          <IcUpload s={15} />
+          <IcUpload s={14} />
           <span className="bar-label">Import</span>
         </button>
 
-        {/* Export PNG */}
+        {/* Export PNG — gradient pill */}
         <button onClick={generateImage} disabled={busy} title={`Export PNG ${paper.label}`}
           style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 12px', borderRadius: R.full,
-            background: busy ? M.s3 : M.primary,
-            color: busy ? M.onSurfaceVar : M.onPrimary,
-            border: 'none', fontSize: 12, fontWeight: 500,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '9px 18px', borderRadius: R.full,
+            background: busy ? M.s3 : M.gradient,
+            color: busy ? M.onSurfaceVar : '#fff',
+            border: 'none', fontSize: 13, fontWeight: 700,
             cursor: busy ? 'not-allowed' : 'pointer',
             whiteSpace: 'nowrap', flexShrink: 0,
-          }}>
-          <IcImage s={15} />
+            boxShadow: busy ? 'none' : '0 4px 14px rgba(99,102,241,0.4)',
+            transition: 'all .15s',
+          }}
+          onMouseEnter={e => { if (!busy) { e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.5)'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+          onMouseLeave={e => { e.currentTarget.style.boxShadow = busy ? 'none' : '0 4px 14px rgba(99,102,241,0.4)'; e.currentTarget.style.transform = 'none'; }}>
+          <IcImage s={14} />
           <span className="bar-label">{busy ? 'Exporting…' : `PNG ${paper.label}`}</span>
         </button>
 
-        {/* Downloads dropdown (icon-only toggle) */}
+        {/* Downloads dropdown */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button onClick={() => setDlOpen(o => !o)} title="Download options"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 36, height: 36, borderRadius: R.full,
-              background: dlOpen ? M.primaryContainer : M.s3,
+              width: 38, height: 38, borderRadius: R.full,
+              background: dlOpen ? M.primaryContainer : 'rgba(0,0,0,0.04)',
               color: dlOpen ? M.primary : M.onSurfaceVar,
-              border: 'none', cursor: 'pointer', flexShrink: 0,
+              border: dlOpen ? `1px solid ${M.outlineVar}` : '1px solid transparent',
+              cursor: 'pointer', transition: 'all .15s',
             }}>
             <IcChevDown s={16} />
           </button>
@@ -508,11 +538,11 @@ export default function App() {
           {dlOpen && (
             <div className="dl-panel" style={{
               position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              background: M.s0, border: `1px solid ${M.outlineVar}`,
-              borderRadius: R.lg, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-              minWidth: 210, zIndex: 300, overflow: 'hidden',
+              background: '#fff', border: `1px solid ${M.outlineVar}`,
+              borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.06)',
+              minWidth: 220, zIndex: 300, overflow: 'hidden',
             }}>
-              <div style={{ padding: '10px 14px 6px', fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase' }}>
+              <div style={{ padding: '12px 16px 8px', fontSize: 10, fontWeight: 800, color: M.onSurfaceVar, letterSpacing: 1.2, textTransform: 'uppercase' }}>
                 Download Options
               </div>
               {[
@@ -524,20 +554,23 @@ export default function App() {
                 <button key={label} onClick={fn}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-                    padding: '10px 14px', border: 'none', background: 'transparent',
+                    padding: '10px 16px', border: 'none', background: 'transparent',
                     cursor: 'pointer', textAlign: 'left',
-                    borderTop: `1px solid ${M.s3}`, transition: 'background .12s', fontFamily: 'inherit',
+                    borderTop: `1px solid rgba(0,0,0,0.04)`, transition: 'background .12s', fontFamily: 'inherit',
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = M.s2}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <span style={{ color: M.primary, display: 'flex', flexShrink: 0 }}>{ic}</span>
+                  <span style={{
+                    color: M.primary, display: 'flex', flexShrink: 0,
+                    background: M.primaryContainer, borderRadius: 8, padding: 6,
+                  }}>{ic}</span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: M.onSurface }}>{label}</div>
                     <div style={{ fontSize: 11, color: M.onSurfaceVar }}>{sub}</div>
                   </div>
                 </button>
               ))}
-              <div style={{ padding: '8px 14px 10px', borderTop: `1px solid ${M.s3}` }}>
+              <div style={{ padding: '8px 16px 12px', borderTop: `1px solid rgba(0,0,0,0.04)` }}>
                 <div style={{ fontSize: 11, color: M.onSurfaceVar }}>Page {page + 1} of {totalPages} · {products.length} products</div>
               </div>
             </div>
@@ -548,7 +581,7 @@ export default function App() {
       {/* Close download panel on outside click */}
       {dlOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 200 }} onClick={() => setDlOpen(false)} />}
 
-      <div style={{ padding: '14px 14px 100px', maxWidth: 780, margin: '0 auto' }}>
+      <div style={{ padding: '20px 16px 100px', maxWidth: 840, margin: '0 auto' }}>
 
         {/* ── Shelf ── */}
         <div
@@ -557,23 +590,38 @@ export default function App() {
           onDragLeave={e => { const rc = e.currentTarget.getBoundingClientRect(); if (e.clientX < rc.left || e.clientX > rc.right || e.clientY < rc.top || e.clientY > rc.bottom) setDragOverShelf(false); }}
           onDrop={handleDropOnShelf}
           style={{
-            background: dragOverShelf ? `${M.primary}0E` : (savedCards.length > 0 ? M.s1 : 'transparent'),
+            background: dragOverShelf
+              ? 'rgba(99,102,241,0.05)'
+              : (savedCards.length > 0 ? '#fff' : 'transparent'),
             border: dragOverShelf
               ? `2px dashed ${M.primary}`
-              : (savedCards.length > 0 ? `1px solid ${M.outlineVar}` : `1.5px dashed ${M.outlineVar}`),
-            borderRadius: R.lg,
-            padding: savedCards.length > 0 || dragOverShelf ? '11px 14px' : '9px 14px',
-            marginBottom: 12,
-            boxShadow: dragOverShelf ? `0 0 0 4px ${M.primary}18` : 'none',
+              : (savedCards.length > 0 ? `1px solid ${M.outlineVar}` : `2px dashed rgba(99,102,241,0.18)`),
+            borderRadius: 20,
+            padding: savedCards.length > 0 || dragOverShelf ? '14px 16px' : '12px 16px',
+            marginBottom: 16,
+            boxShadow: dragOverShelf
+              ? `0 0 0 4px rgba(99,102,241,0.1)`
+              : (savedCards.length > 0 ? M.shadowMd : 'none'),
             transition: 'all 0.18s',
           }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: savedCards.length > 0 || dragOverShelf ? 10 : 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: dragOverShelf ? M.primary : M.onSurfaceVar }}>
-              {dragOverShelf ? '⭐ Drop here to save' : savedCards.length > 0 ? `⭐ Shelf (${savedCards.length}) — tap to add · drag to card` : '⭐ Shelf empty — use ★ button or drag a card here'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: savedCards.length > 0 || dragOverShelf ? 12 : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {savedCards.length > 0 && (
+                <div style={{
+                  padding: '2px 10px', borderRadius: R.full,
+                  background: M.gradient, color: '#fff',
+                  fontSize: 11, fontWeight: 700,
+                }}>⭐ {savedCards.length}</div>
+              )}
+              <div style={{ fontSize: 12, fontWeight: 700, color: dragOverShelf ? M.primary : (savedCards.length > 0 ? M.onSurface : M.onSurfaceVar) }}>
+                {dragOverShelf ? 'Drop here to save to shelf'
+                  : savedCards.length > 0 ? 'Shelf — tap to add · drag to card'
+                  : 'Shelf empty — drag a card here or use ★'}
+              </div>
             </div>
             {savedCards.length > 0 && !dragOverShelf && (
               <button onClick={() => { setSavedCards([]); showToast('Shelf cleared'); }}
-                style={{ fontSize: 11, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: '2px 6px', borderRadius: R.xs }}>Clear</button>
+                style={{ fontSize: 11, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '3px 8px', borderRadius: 6 }}>Clear</button>
             )}
           </div>
           {(savedCards.length > 0 || dragOverShelf) && (
@@ -598,47 +646,49 @@ export default function App() {
         </div>
 
         {/* ── Controls Panel ── */}
-        <div style={{ background: M.s1, borderRadius: R.lg, padding: '14px 16px', marginBottom: 14, border: `1px solid ${M.outlineVar}` }}>
+        <div style={{ background: '#fff', borderRadius: 20, padding: '20px 20px 16px', marginBottom: 16, border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowMd }}>
 
           {/* Font */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>Font Style</div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div className="accent-bar" />
+              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase' }}>Font Style</div>
+            </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <div className="ss" style={{ flex: 1, display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4, minWidth: 0 }}>
+              <div className="ss" style={{ flex: 1, display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, minWidth: 0 }}>
                 {FONTS.map(f => <Chip key={f.name} label={f.name} selected={font === f.name} onClick={() => setFont(f.name)} />)}
               </div>
-              <select
-                value={font}
-                onChange={e => setFont(e.target.value)}
+              <select value={font} onChange={e => setFont(e.target.value)}
                 style={{
-                  flexShrink: 0,
-                  padding: '6px 12px',
-                  borderRadius: R.sm,
-                  border: `1px solid ${M.outline}`,
-                  background: M.s1,
-                  color: M.onSurface,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  outline: 'none',
-                  fontFamily: `'${font}', sans-serif`,
-                }}
-              >
+                  flexShrink: 0, padding: '7px 12px', borderRadius: 10,
+                  border: `1.5px solid ${M.outlineVar}`, background: '#fff',
+                  color: M.onSurface, fontSize: 13, cursor: 'pointer', outline: 'none',
+                  fontFamily: `'${font}', sans-serif`, fontWeight: 500,
+                }}>
                 {FONTS.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
               </select>
             </div>
           </div>
 
+          <div style={{ height: 1, background: M.outlineVar, margin: '0 -4px 16px' }} />
+
           {/* Columns + Paper */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, alignItems: 'start', marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 20, alignItems: 'start', marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>Columns</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div className="accent-bar" />
+                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase' }}>Columns</div>
+              </div>
               <SegBtn options={GRID_OPTIONS} value={gridCols} onChange={setGridCols} />
             </div>
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 7 }}>
-                Paper <span style={{ color: M.error, textTransform: 'none', fontSize: 9, fontWeight: 400 }}>PNG Export</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div className="accent-bar" />
+                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                  Paper <span style={{ color: M.error, textTransform: 'none', fontSize: 10, fontWeight: 400, marginLeft: 4 }}>PNG Export</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {PAPER_SIZES.map(s => <Chip key={s.id} label={s.label} selected={paperSize === s.id} onClick={() => setPaperSize(s.id)} />)}
               </div>
             </div>
@@ -646,55 +696,59 @@ export default function App() {
 
           {/* Paper info + Clear */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ padding: '6px 12px', borderRadius: R.sm, background: M.s2, border: `1px solid ${M.outlineVar}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: Math.round(22 * (paper.w / paper.h)), height: 22, border: `1.5px solid ${M.primary}`, borderRadius: 2, background: M.s0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+            <div style={{
+              padding: '8px 14px', borderRadius: 12,
+              background: M.gradientSubtle, border: `1px solid ${M.outlineVar}`,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <div style={{ width: Math.round(24 * (paper.w / paper.h)), height: 24, border: `2px solid ${M.primary}`, borderRadius: 3, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'center' }}>
                   {[0, 1, 2].slice(0, gridCols === 3 ? 3 : 2).map((_, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 1 }}>
+                    <div key={i} style={{ display: 'flex', gap: 1.5 }}>
                       {Array.from({ length: gridCols }).map((_, j) => (
-                        <div key={j} style={{ width: 2, height: 2, background: M.primary, borderRadius: 0.5, opacity: .8 }} />
+                        <div key={j} style={{ width: 2.5, height: 2.5, background: M.primary, borderRadius: 0.5, opacity: .7 }} />
                       ))}
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 11, color: M.primary, fontWeight: 700 }}>{paper.label} · {paper.w}×{paper.h}px</div>
+                <div style={{ fontSize: 12, color: M.primary, fontWeight: 700 }}>{paper.label} · {paper.w}×{paper.h}px</div>
                 <div style={{ fontSize: 10, color: M.onSurfaceVar }}>200 DPI · {paper.desc}</div>
               </div>
             </div>
-            <Btn variant={clearConfirm ? 'error' : 'outlined'} label={clearConfirm ? '⚠️ Confirm?' : '🗑️ Clear All'} onClick={clearAll} style={{ fontSize: 12, padding: '7px 14px' }} />
+            <Btn variant={clearConfirm ? 'error' : 'outlined'} label={clearConfirm ? '⚠️ Confirm?' : '🗑️ Clear All'} onClick={clearAll} style={{ fontSize: 12, padding: '8px 16px' }} />
           </div>
         </div>
 
         {/* Drag hint */}
         {isDragging && (
           <div style={{
-            textAlign: 'center', fontSize: 11, fontWeight: 600, marginBottom: 10,
-            padding: '8px', borderRadius: R.sm,
-            background: dragSrcType === 'shelf' ? `${M.secondary}14` : `${M.primary}12`,
+            textAlign: 'center', fontSize: 12, fontWeight: 600, marginBottom: 14,
+            padding: '10px 16px', borderRadius: 12,
+            background: dragSrcType === 'shelf' ? 'rgba(139,92,246,0.07)' : 'rgba(99,102,241,0.07)',
             color:      dragSrcType === 'shelf' ? M.secondary : M.primary,
-            border: `1px solid ${dragSrcType === 'shelf' ? M.secondary : M.primary}33`,
+            border: `1px solid ${dragSrcType === 'shelf' ? 'rgba(139,92,246,0.2)' : 'rgba(99,102,241,0.2)'}`,
           }}>
             {dragSrcType === 'shelf'
-              ? '⭐ Drop onto a card or empty slot to add from shelf'
+              ? '⭐ Drop onto any slot — card goes to top of grid'
               : '⠿ Drop onto a card to insert before it · empty slot to append · drag UP to shelf to save ⭐'}
           </div>
         )}
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 14 }}>
             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-              style={{ padding: '6px 18px', borderRadius: R.full, border: `1px solid ${M.outline}`, background: 'transparent', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: M.primary, opacity: page === 0 ? .35 : 1, fontFamily: 'inherit', transition: 'opacity .15s' }}>◀</button>
-            <span style={{ fontSize: 13, color: M.onSurfaceVar, fontWeight: 500, minWidth: 80, textAlign: 'center' }}>Page {page + 1} / {totalPages}</span>
+              style={{ padding: '7px 20px', borderRadius: R.full, border: `1.5px solid ${M.outlineVar}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: M.primary, opacity: page === 0 ? .35 : 1, fontFamily: 'inherit', boxShadow: M.shadowSm, transition: 'all .15s' }}>◀ Prev</button>
+            <span style={{ fontSize: 13, color: M.onSurfaceVar, fontWeight: 600, minWidth: 100, textAlign: 'center' }}>Page {page + 1} / {totalPages}</span>
             <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-              style={{ padding: '6px 18px', borderRadius: R.full, border: `1px solid ${M.outline}`, background: 'transparent', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: M.primary, opacity: page >= totalPages - 1 ? .35 : 1, fontFamily: 'inherit', transition: 'opacity .15s' }}>▶</button>
+              style={{ padding: '7px 20px', borderRadius: R.full, border: `1.5px solid ${M.outlineVar}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: M.primary, opacity: page >= totalPages - 1 ? .35 : 1, fontFamily: 'inherit', boxShadow: M.shadowSm, transition: 'all .15s' }}>Next ▶</button>
           </div>
         )}
 
         {/* ── Sticker Grid ── */}
-        <div style={{ background: M.s1, borderRadius: R.lg, padding: '14px 12px', border: `1px solid ${M.outlineVar}` }}>
+        <div style={{ background: 'rgba(99,102,241,0.03)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: '0 2px 12px rgba(99,102,241,0.04)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
             {pageProds.map(p => (
               <StickerCard key={p.id} p={p} font={font}
@@ -714,13 +768,14 @@ export default function App() {
                 onDrop={handleDropOnEmpty}
                 className={dragOverSlot === `e-${i}` ? 'doe' : ''}
                 style={{
-                  border: `2px dashed ${M.outlineVar}`, borderRadius: R.md, minHeight: 88,
+                  border: `2px dashed rgba(99,102,241,0.2)`, borderRadius: 14, minHeight: 96,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  color: M.outlineVar, fontSize: 20, cursor: 'pointer', transition: 'all .15s', gap: 3,
+                  color: 'rgba(99,102,241,0.3)', fontSize: 22, cursor: 'pointer', transition: 'all .15s', gap: 4,
+                  background: 'rgba(99,102,241,0.01)',
                 }}
-                onMouseEnter={e => { if (!isDragging) { e.currentTarget.style.borderColor = M.primary; e.currentTarget.style.color = M.primary; } }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = M.outlineVar; e.currentTarget.style.color = M.outlineVar; }}>
-                {isDragging ? <span style={{ fontSize: 18 }}>📋</span> : '+'}
+                onMouseEnter={e => { if (!isDragging) { e.currentTarget.style.borderColor = M.primary; e.currentTarget.style.color = M.primary; e.currentTarget.style.background = 'rgba(99,102,241,0.04)'; } }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)'; e.currentTarget.style.color = 'rgba(99,102,241,0.3)'; e.currentTarget.style.background = 'rgba(99,102,241,0.01)'; }}>
+                {isDragging ? <span style={{ fontSize: 18 }}>📋</span> : <span style={{ fontSize: 24, fontWeight: 300 }}>+</span>}
                 {isDragging && <span style={{ fontSize: 9, fontWeight: 700, color: M.primary }}>drop here</span>}
               </div>
             ))}
@@ -729,20 +784,21 @@ export default function App() {
       </div>
 
       {/* ── FAB ── */}
-      <div style={{ position: 'fixed', bottom: 24, right: 20, zIndex: 200 }}>
+      <div style={{ position: 'fixed', bottom: 28, right: 24, zIndex: 200 }}>
         <button onClick={openAdd}
           style={{
             display: 'flex', alignItems: 'center', gap: 10,
-            padding: '14px 22px',
-            background: M.primaryContainer, color: M.onPrimaryContainer,
-            border: 'none', borderRadius: R.xl,
-            fontSize: 15, fontWeight: 600, cursor: 'pointer',
-            boxShadow: '0 4px 20px rgba(0,84,163,0.28)',
+            padding: '15px 28px',
+            background: M.gradient, color: '#fff',
+            border: 'none', borderRadius: R.full,
+            fontSize: 15, fontWeight: 700, cursor: 'pointer',
+            boxShadow: '0 8px 28px rgba(99,102,241,0.42), 0 3px 10px rgba(99,102,241,0.25)',
             fontFamily: `'${font}',sans-serif`,
-            transition: 'all .15s cubic-bezier(.2,0,0,1)',
+            transition: 'all .2s cubic-bezier(.2,0,0,1)',
+            letterSpacing: 0.2,
           }}
-          onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,84,163,0.38)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-          onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,84,163,0.28)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+          onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 12px 40px rgba(99,102,241,0.52), 0 6px 16px rgba(99,102,241,0.32)'; e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)'; }}
+          onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(99,102,241,0.42), 0 3px 10px rgba(99,102,241,0.25)'; e.currentTarget.style.transform = 'none'; }}>
           <span style={{ fontSize: 20, lineHeight: 1 }}>＋</span>
           <span className="fab-label">Add Sticker</span>
         </button>
@@ -775,11 +831,14 @@ export default function App() {
 
       {/* ── Edit / Add Modal ── */}
       {modal !== null && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.52)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16, backdropFilter: 'blur(5px)' }}>
-          <div style={{ background: M.s1, borderRadius: R.xl, padding: '24px 20px', width: '100%', maxWidth: 400, boxShadow: '0 20px 64px rgba(0,0,0,0.3)', maxHeight: '92vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,12,50,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16, backdropFilter: 'blur(10px)' }}>
+          <div className="modal-card" style={{ background: '#fff', borderRadius: 24, padding: '28px 24px', width: '100%', maxWidth: 440, boxShadow: '0 32px 80px rgba(0,0,0,0.22), 0 8px 24px rgba(0,0,0,0.1)', maxHeight: '92vh', overflowY: 'auto', border: `1px solid ${M.outlineVar}` }}>
 
-            <div style={{ fontSize: 20, fontWeight: 400, color: M.onSurface, marginBottom: 18 }}>
-              {modal === 'add' ? 'Add Product' : 'Edit Product'}
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: M.onSurface, letterSpacing: -0.4, lineHeight: 1.2 }}>
+                {modal === 'add' ? '✨ New Sticker' : '✏️ Edit Sticker'}
+              </div>
+              <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Fill in product details below</div>
             </div>
 
             {/* Fields */}
@@ -799,40 +858,41 @@ export default function App() {
             </div>
 
             {/* Colour picker */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Sticker Color</div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {THEMES.map((t, i) => (
                   <div key={i} onClick={() => setForm(v => ({ ...v, theme: i }))} title={t.label} style={{
-                    width: 30, height: 30, borderRadius: '50%', background: t.color, cursor: 'pointer',
+                    width: 36, height: 36, borderRadius: '50%', background: t.color, cursor: 'pointer',
                     border: form.theme === i ? '3px solid #fff' : '3px solid transparent',
-                    boxShadow: form.theme === i ? `0 0 0 2.5px ${t.color},0 2px 8px ${t.color}60` : '0 1px 4px rgba(0,0,0,0.15)',
-                    transition: 'all .15s',
+                    boxShadow: form.theme === i ? `0 0 0 3px ${t.color}, 0 4px 12px ${t.color}60` : '0 2px 6px rgba(0,0,0,0.15)',
+                    transform: form.theme === i ? 'scale(1.18)' : 'scale(1)',
+                    transition: 'all .15s cubic-bezier(.2,0,0,1)',
                   }} />
                 ))}
               </div>
             </div>
 
             {/* Style toggle */}
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Style</div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Style</div>
               <StyleToggle value={form.filled} onChange={v => setForm(f => ({ ...f, filled: v }))} color={activeColor} />
             </div>
 
-            {/* Save Self Card — set as default style */}
+            {/* Set as default style */}
             <div style={{
-              marginBottom: 14, padding: '9px 12px', borderRadius: R.md,
-              background: isCurrentDefault ? `${M.primary}0A` : M.s2,
-              border: `1px solid ${isCurrentDefault ? M.primary + '55' : M.outlineVar}`,
+              marginBottom: 14, padding: '10px 14px', borderRadius: 12,
+              background: isCurrentDefault ? `rgba(99,102,241,0.06)` : M.s2,
+              border: `1px solid ${isCurrentDefault ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
               transition: 'all .2s',
             }}>
-              <div style={{ fontSize: 11, color: isCurrentDefault ? M.primary : M.onSurfaceVar, fontWeight: isCurrentDefault ? 600 : 400 }}>
+              <div style={{ fontSize: 12, color: isCurrentDefault ? M.primary : M.onSurfaceVar, fontWeight: isCurrentDefault ? 600 : 400 }}>
                 {isCurrentDefault ? '✓ This is your default card style' : 'Save color & style as default for new cards'}
               </div>
               {!isCurrentDefault && (
                 <button onClick={applyDefaultStyle} style={{
-                  padding: '5px 12px', borderRadius: R.full, flexShrink: 0,
+                  padding: '5px 13px', borderRadius: R.full, flexShrink: 0,
                   background: M.s3, color: M.onSurfaceVar,
                   border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
                 }}>Set Default</button>
@@ -841,9 +901,9 @@ export default function App() {
 
             {/* One-line name */}
             <div style={{
-              marginBottom: 14, padding: '11px 14px', borderRadius: R.md,
-              background: form.ellipsis ? `${M.primary}0C` : M.s2,
-              border: `1px solid ${form.ellipsis ? M.primary : M.outlineVar}`,
+              marginBottom: 14, padding: '12px 14px', borderRadius: 12,
+              background: form.ellipsis ? `rgba(99,102,241,0.06)` : M.s2,
+              border: `1px solid ${form.ellipsis ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               transition: 'all .2s',
             }}>
@@ -852,9 +912,9 @@ export default function App() {
                   One-line name
                   <span style={{
                     marginLeft: 8, fontSize: 10, fontWeight: 700,
-                    padding: '2px 6px', borderRadius: R.full,
-                    background: form.ellipsis ? M.primary : M.outlineVar,
-                    color: form.ellipsis ? M.onPrimary : M.onSurfaceVar,
+                    padding: '2px 7px', borderRadius: R.full,
+                    background: form.ellipsis ? M.primary : M.s4,
+                    color: form.ellipsis ? '#fff' : M.onSurfaceVar,
                     transition: 'all .2s',
                   }}>{form.ellipsis ? 'ON' : 'OFF'}</span>
                 </div>
@@ -867,9 +927,9 @@ export default function App() {
 
             {/* Save to shelf */}
             <div style={{
-              marginBottom: 16, padding: '12px 14px', borderRadius: R.md,
-              background: addToShelf ? `${M.secondary}0D` : M.s2,
-              border: `1px solid ${addToShelf ? M.secondary : M.outlineVar}`,
+              marginBottom: 16, padding: '12px 14px', borderRadius: 12,
+              background: addToShelf ? `rgba(139,92,246,0.06)` : M.s2,
+              border: `1px solid ${addToShelf ? 'rgba(139,92,246,0.2)' : 'rgba(0,0,0,0.06)'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               transition: 'all .2s',
             }}>
@@ -895,12 +955,25 @@ export default function App() {
             )}
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <Btn variant="outlined" label="Cancel" onClick={() => setModal(null)} style={{ flex: 1 }} />
-              <Btn variant="filled" disabled={!canSave}
-                label={modal === 'add'
-                  ? (addToShelf ? 'Add to grid & shelf ⭐' : 'Add Sticker')
-                  : (addToShelf ? 'Save & add to shelf ⭐' : 'Save Changes')}
-                onClick={save} style={{ flex: 2 }} />
+              <button onClick={() => setModal(null)} style={{
+                flex: 1, padding: '12px 0', borderRadius: R.full,
+                border: `1.5px solid ${M.outlineVar}`, background: '#fff',
+                color: M.primary, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                fontFamily: 'inherit', transition: 'all .15s',
+              }}>Cancel</button>
+              <button onClick={save} disabled={!canSave} style={{
+                flex: 2, padding: '12px 0', borderRadius: R.full, border: 'none',
+                background: canSave ? M.gradient : M.s3,
+                color: canSave ? '#fff' : M.onSurfaceVar,
+                fontSize: 14, fontWeight: 700,
+                cursor: canSave ? 'pointer' : 'not-allowed',
+                boxShadow: canSave ? '0 4px 14px rgba(99,102,241,0.4)' : 'none',
+                fontFamily: 'inherit', transition: 'all .15s',
+              }}>
+                {modal === 'add'
+                  ? (addToShelf ? 'Add to Grid & Shelf ⭐' : 'Add Sticker')
+                  : (addToShelf ? 'Save & Add to Shelf ⭐' : 'Save Changes')}
+              </button>
             </div>
           </div>
         </div>
