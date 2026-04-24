@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { M, R, THEMES } from '../lib/constants.js';
 
-export default function ShelfPickDialog({ open, onClose, savedCards, font, onPickShelf, onNewCreate, onRemoveShelf }) {
+export default function ShelfPickDialog({ open, onClose, savedCards, font, cardStyle, onPickShelf, onNewCreate, onRemoveShelf }) {
   const [search,        setSearch]        = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -120,7 +120,10 @@ export default function ShelfPickDialog({ open, onClose, savedCards, font, onPic
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       }}>{s.name}</div>
                       <div style={{ fontSize: 11, color: filled ? 'rgba(255,255,255,0.7)' : M.onSurfaceVar, marginTop: 1 }}>
-                        Ram {s.ram} / Rom {s.rom} GB · {s.battery} mAh
+                        {cardStyle === 'premium'
+                          ? [s.brand, s.chip, s.camera ? `${s.camera}MP` : null].filter(Boolean).join(' · ') || `${s.battery || ''}mAh`
+                          : `Ram ${s.ram} / Rom ${s.rom} GB · ${s.battery} mAh`
+                        }
                       </div>
                     </div>
 

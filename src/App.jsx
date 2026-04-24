@@ -7,6 +7,7 @@ import Field        from './components/Field.jsx';
 import Snack        from './components/Snack.jsx';
 import StyleToggle  from './components/StyleToggle.jsx';
 import ShelfCard    from './components/ShelfCard.jsx';
+import StickerCard  from './components/StickerCard.jsx';
 import PriceTagCard from './components/PriceTagCard.jsx';
 import ShelfPickDialog   from './dialogs/ShelfPickDialog.jsx';
 import CsvDialog         from './dialogs/CsvDialog.jsx';
@@ -62,12 +63,27 @@ export default function App() {
   const [templates,     setTemplates]     = useState([]);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [defaultStyle,  setDefaultStyle]  = useState({ theme: 0, filled: false, ellipsis: false });
+  const [cardStyle,     setCardStyle]     = useState('classic');
+  const [pendingStyle,  setPendingStyle]  = useState(null);
 
   const canvasRef           = useRef(null);
+  const premiumGridRef      = useRef(null);
   const savedLoadedRef      = useRef(false);
   const touchDragRef        = useRef(null);
   const templatesInitRef    = useRef(false);
   const defaultStyleInitRef = useRef(false);
+  const cardStyleInitRef    = useRef(false);
+
+  /* ── cardStyle persistence ──────────────────────────────────── */
+  useEffect(() => {
+    const v = lsGet('pts_card_style');
+    if (v === 'classic' || v === 'premium') setCardStyle(v);
+    cardStyleInitRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!cardStyleInitRef.current) return;
+    lsSet('pts_card_style', cardStyle);
+  }, [cardStyle]);
 
   const totalPages  = Math.max(1, Math.ceil(products.length / PER_PAGE));
   const pageProds   = products.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
@@ -75,7 +91,9 @@ export default function App() {
   const paper       = PAPER_SIZES.find(s => s.id === paperSize) || PAPER_SIZES[1];
   const isDragging  = dragSrcId !== null;
   const activeColor = THEMES[form.theme]?.color || M.primary;
-  const canSave     = !!(form.name && form.rom && form.battery && form.price);
+  const canSave = cardStyle === 'classic'
+    ? !!(form.name && form.rom && form.battery && form.price)
+    : !!(form.name && form.price);
   const isCurrentDefault =
     form.theme === defaultStyle.theme &&
     !!form.filled  === !!defaultStyle.filled &&
@@ -158,7 +176,7 @@ export default function App() {
   }
 
   function save() {
-    if (!form.name || !form.rom || !form.battery || !form.price) return;
+    if (!canSave) return;
     const nc = { ...form, id: Date.now() };
     if (modal === 'add') {
       setProducts(prev => { const n = [...prev, nc]; setPage(Math.ceil(n.length / PER_PAGE) - 1); return n; });
@@ -225,6 +243,18 @@ export default function App() {
   function deleteTemplate(id) {
     setTemplates(prev => prev.filter(t => t.id !== id));
     showToast('Template deleted');
+  }
+
+  /* ── Card style switch ──────────────────────────────────────── */
+  function handleStyleChange(newStyle) {
+    if (newStyle === cardStyle) return;
+    if (products.length > 0) { setPendingStyle(newStyle); return; }
+    applyStyleChange(newStyle);
+  }
+  function applyStyleChange(style) {
+    setCardStyle(style);
+    setProducts([]); setPage(0); setPendingStyle(null);
+    showToast(`Switched to ${style === 'classic' ? 'Classic' : 'Premium'} style`);
   }
 
   /* ── Default card style helper ──────────────────────────────── */
@@ -319,10 +349,38 @@ export default function App() {
 
   /* ── Canvas render ───────────────────────────────────────── */
   async function renderToCanvas() {
+    const { w: W, h: H } = paper;
+
+    /* Premium: capture DOM grid with html2canvas */
+    if (cardStyle === 'premium') {
+      const el = premiumGridRef.current;
+      if (!el) { showToast('⚠️ Grid not ready'); return null; }
+      await new Promise(r => setTimeout(r, 400)); // let fonts settle
+      const { default: html2canvas } = await import('html2canvas');
+      const cap = await html2canvas(el, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      const mx = 70, my = 80, maxW = W - mx * 2, maxH = H - my * 2;
+      const nw = cap.width / 3, nh = cap.height / 3;
+      const fit = Math.min(maxW / nw, maxH / nh);
+      const dw = Math.round(nw * fit), dh = Math.round(nh * fit);
+      const dx = mx + Math.round((maxW - dw) / 2);
+      const canvas = canvasRef.current;
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f0f0f0'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#fff';    ctx.fillRect(30, 30, W - 60, H - 60);
+      ctx.drawImage(cap, dx, my, dw, dh);
+      return canvas.toDataURL('image/png');
+    }
+
+    /* Classic: manual canvas draw */
     try { await Promise.all([`400 22px '${font}'`, `700 28px '${font}'`, `900 44px '${font}'`].map(s => document.fonts.load(s))); } catch {}
     await new Promise(r => setTimeout(r, 300));
     const canvas = canvasRef.current;
-    const { w: W, h: H } = paper;
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#f0f0f0'; ctx.fillRect(0, 0, W, H);
@@ -355,6 +413,7 @@ export default function App() {
   async function generateImage() {
     setBusy(true);
     const imgData = await renderToCanvas();
+    if (!imgData) { setBusy(false); return; }
     const { label: sL } = paper;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isMobile) {
@@ -596,6 +655,15 @@ export default function App() {
         {/* ── Controls Panel ── */}
         <div style={{ background: '#fff', borderRadius: 20, padding: '18px 20px', marginBottom: 16, border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowMd }}>
 
+          {/* Row 0: Card Style */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Card Style</div>
+            <select className="ctrl-select" value={cardStyle} onChange={e => handleStyleChange(e.target.value)}>
+              <option value="classic">🏷️ Classic — simple price tag (default)</option>
+              <option value="premium">✨ Premium — 10 phone layouts, auto-selected</option>
+            </select>
+          </div>
+
           {/* Row 1: Font (full width) */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Font</div>
@@ -694,6 +762,7 @@ export default function App() {
               )}
               {savedCards.map(s => (
                 <ShelfCard key={s.savedId} s={s} font={font}
+                  cardStyle={cardStyle}
                   onAdd={() => addSavedToGrid(s)}
                   onRemove={() => removeSavedCard(s.savedId)}
                   onDragStart={e => handleShelfDragStart(s, e)}
@@ -736,15 +805,18 @@ export default function App() {
 
         {/* ── Sticker Grid ── */}
         <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowSm }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
-            {pageProds.map(p => (
-              <PriceTagCard key={p.id} p={p} font={font}
+          <div ref={premiumGridRef} style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
+            {pageProds.map(p => {
+              const CardComp = cardStyle === 'premium' ? PriceTagCard : StickerCard;
+              return (
+              <CardComp key={p.id} p={p} font={font}
                 onClick={() => { if (!isDragging) openEdit(p); }}
                 onDelete={() => remove(p.id)}
                 onSave={() => saveCardToShelf(p)}
                 active={modal === p.id}
                 {...cdp(p)} />
-            ))}
+              );
+            })}
             {Array.from({ length: emptySlots }).map((_, i) => (
               <div key={`e${i}`}
                 data-emptyslot="1"
@@ -808,6 +880,7 @@ export default function App() {
         onClose={() => setShelfPickOpen(false)}
         savedCards={savedCards}
         font={font}
+        cardStyle={cardStyle}
         onPickShelf={sc => { addSavedToGrid(sc); }}
         onNewCreate={() => {
           setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis });
@@ -828,173 +901,180 @@ export default function App() {
               <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Fill in product details below</div>
             </div>
 
-            {/* Fields */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-              {[
-                { label: 'Product Name',       key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
-                { label: 'RAM (GB)',            key: 'ram',     ph: 'e.g. 8 or 8+8',  tag: v => `RAM: ${v} GB` },
-                { label: 'Storage / ROM (GB)', key: 'rom',     ph: 'e.g. 256',        tag: v => `ROM: ${v} GB` },
-                { label: 'Battery (mAh)',       key: 'battery', ph: 'e.g. 5000' },
-                { label: 'Price (THB)',         key: 'price',   ph: 'e.g. 9990' },
-              ].map(f => (
-                <div key={f.key}>
-                  <Field label={f.label} value={form[f.key]}
-                    onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))}
-                    onKeyDown={e => e.key === 'Enter' && save()}
-                    placeholder={f.ph} />
-                  {f.tag && form[f.key] && (
-                    <div style={{ marginTop: 5 }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '3px 10px', borderRadius: 20,
-                        fontSize: 11, fontWeight: 700,
-                        background: `${THEMES[form.theme].color}18`,
-                        color: THEMES[form.theme].color,
-                        border: `1px solid ${THEMES[form.theme].color}40`,
-                      }}>{f.tag(form[f.key])}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* ── Phone Details (premium layout fields) ── */}
-            <div style={{ borderTop: `1px solid ${M.outlineVar}`, paddingTop: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar,
-                letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>
-                Phone Details
+            {/* ── CLASSIC fields ── */}
+            {cardStyle === 'classic' && (<>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                {[
+                  { label: 'Product Name',       key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
+                  { label: 'RAM (GB)',            key: 'ram',     ph: 'e.g. 8 or 8+8',  tag: v => `RAM: ${v} GB` },
+                  { label: 'Storage / ROM (GB)', key: 'rom',     ph: 'e.g. 256',        tag: v => `ROM: ${v} GB` },
+                  { label: 'Battery (mAh)',       key: 'battery', ph: 'e.g. 5000' },
+                  { label: 'Price (THB)',         key: 'price',   ph: 'e.g. 9990' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <Field label={f.label} value={form[f.key]}
+                      onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && save()}
+                      placeholder={f.ph} />
+                    {f.tag && form[f.key] && (
+                      <div style={{ marginTop: 5 }}>
+                        <span style={{
+                          display: 'inline-block', padding: '3px 10px', borderRadius: 20,
+                          fontSize: 11, fontWeight: 700,
+                          background: `${THEMES[form.theme].color}18`,
+                          color: THEMES[form.theme].color,
+                          border: `1px solid ${THEMES[form.theme].color}40`,
+                        }}>{f.tag(form[f.key])}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
 
-              {/* Brand */}
-              <div style={{ marginBottom: 10 }}>
+              {/* Colour picker */}
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {THEMES.map((t, i) => (
+                    <div key={i} onClick={() => setForm(v => ({ ...v, theme: i }))} title={t.label} style={{
+                      width: 36, height: 36, borderRadius: '50%', background: t.color, cursor: 'pointer',
+                      border: form.theme === i ? '3px solid #fff' : '3px solid transparent',
+                      boxShadow: form.theme === i ? `0 0 0 3px ${t.color}, 0 4px 12px ${t.color}60` : '0 2px 6px rgba(0,0,0,0.15)',
+                      transform: form.theme === i ? 'scale(1.18)' : 'scale(1)',
+                      transition: 'all .15s cubic-bezier(.2,0,0,1)',
+                    }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Style toggle */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Style</div>
+                <StyleToggle value={form.filled} onChange={v => setForm(f => ({ ...f, filled: v }))} color={activeColor} />
+              </div>
+
+              {/* Set as default style */}
+              <div style={{
+                marginBottom: 14, padding: '10px 14px', borderRadius: 12,
+                background: isCurrentDefault ? `rgba(99,102,241,0.06)` : M.s2,
+                border: `1px solid ${isCurrentDefault ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                transition: 'all .2s',
+              }}>
+                <div style={{ fontSize: 12, color: isCurrentDefault ? M.primary : M.onSurfaceVar, fontWeight: isCurrentDefault ? 600 : 400 }}>
+                  {isCurrentDefault ? '✓ This is your default card style' : 'Save color & style as default for new cards'}
+                </div>
+                {!isCurrentDefault && (
+                  <button onClick={applyDefaultStyle} style={{
+                    padding: '5px 13px', borderRadius: R.full, flexShrink: 0,
+                    background: M.s3, color: M.onSurfaceVar,
+                    border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  }}>Set Default</button>
+                )}
+              </div>
+
+              {/* One-line name */}
+              <div style={{
+                marginBottom: 14, padding: '12px 14px', borderRadius: 12,
+                background: form.ellipsis ? `rgba(99,102,241,0.06)` : M.s2,
+                border: `1px solid ${form.ellipsis ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                transition: 'all .2s',
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface, lineHeight: 1.3 }}>
+                    One-line name
+                    <span style={{
+                      marginLeft: 8, fontSize: 10, fontWeight: 700,
+                      padding: '2px 7px', borderRadius: R.full,
+                      background: form.ellipsis ? M.primary : M.s4,
+                      color: form.ellipsis ? '#fff' : M.onSurfaceVar,
+                      transition: 'all .2s',
+                    }}>{form.ellipsis ? 'ON' : 'OFF'}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: M.onSurfaceVar, marginTop: 2 }}>
+                    {form.ellipsis ? 'Long names truncated with …' : 'Names wrap to multiple lines'}
+                  </div>
+                </div>
+                <Switch value={form.ellipsis} onChange={v => setForm(f => ({ ...f, ellipsis: v }))} />
+              </div>
+            </>)}
+
+            {/* ── PREMIUM fields ── */}
+            {cardStyle === 'premium' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
                 <Field label="Brand" value={form.brand || ''}
                   onChange={e => setForm(v => ({ ...v, brand: e.target.value }))}
                   onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. Samsung" />
-              </div>
-
-              {/* Camera + Chip */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <Field label="Camera (MP)" value={form.camera || ''}
-                  onChange={e => setForm(v => ({ ...v, camera: e.target.value }))}
+                  placeholder="e.g. Google" />
+                <Field label="Product Name (Model)" value={form.name}
+                  onChange={e => setForm(v => ({ ...v, name: e.target.value }))}
                   onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. 50" />
-                <Field label="Chip" value={form.chip || ''}
-                  onChange={e => setForm(v => ({ ...v, chip: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder='e.g. SD 8 Gen 3' />
-              </div>
-
-              {/* Display + Old Price */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <Field label='Display (")' value={form.display || ''}
-                  onChange={e => setForm(v => ({ ...v, display: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. 6.7" />
-                <Field label="Original Price" value={form.oldPrice || ''}
-                  onChange={e => setForm(v => ({ ...v, oldPrice: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. 9990" />
-              </div>
-
-              {/* Has 5G */}
-              <div style={{
-                marginBottom: 10, padding: '10px 14px', borderRadius: 12,
-                background: form.has5g ? 'rgba(26,115,232,0.06)' : M.s2,
-                border: `1px solid ${form.has5g ? 'rgba(26,115,232,0.2)' : 'rgba(0,0,0,0.06)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>
-                  5G Connectivity
+                  placeholder="e.g. Pixel 9 Pro XL" />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label="Battery (mAh)" value={form.battery}
+                    onChange={e => setForm(v => ({ ...v, battery: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. 5100" />
+                  <Field label="Camera (MP)" value={form.camera || ''}
+                    onChange={e => setForm(v => ({ ...v, camera: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. 50" />
                 </div>
-                <Switch value={!!form.has5g} onChange={v => setForm(f => ({ ...f, has5g: v }))} />
-              </div>
-
-              {/* Featured Spec */}
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar,
-                  letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
-                  Featured Spec (forces Camera Pro layout)
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label="Chip" value={form.chip || ''}
+                    onChange={e => setForm(v => ({ ...v, chip: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. Tensor G4" />
+                  <Field label='Display (")' value={form.display || ''}
+                    onChange={e => setForm(v => ({ ...v, display: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. 6.8" />
                 </div>
-                <select className="ctrl-select"
-                  value={form.featuredSpec || ''}
-                  onChange={e => setForm(v => ({ ...v, featuredSpec: e.target.value }))}>
-                  <option value="">Auto-detect</option>
-                  <option value="camera">📸 Camera</option>
-                  <option value="battery">🔋 Battery</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Colour picker */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {THEMES.map((t, i) => (
-                  <div key={i} onClick={() => setForm(v => ({ ...v, theme: i }))} title={t.label} style={{
-                    width: 36, height: 36, borderRadius: '50%', background: t.color, cursor: 'pointer',
-                    border: form.theme === i ? '3px solid #fff' : '3px solid transparent',
-                    boxShadow: form.theme === i ? `0 0 0 3px ${t.color}, 0 4px 12px ${t.color}60` : '0 2px 6px rgba(0,0,0,0.15)',
-                    transform: form.theme === i ? 'scale(1.18)' : 'scale(1)',
-                    transition: 'all .15s cubic-bezier(.2,0,0,1)',
-                  }} />
-                ))}
-              </div>
-            </div>
-
-            {/* Style toggle */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Style</div>
-              <StyleToggle value={form.filled} onChange={v => setForm(f => ({ ...f, filled: v }))} color={activeColor} />
-            </div>
-
-            {/* Set as default style */}
-            <div style={{
-              marginBottom: 14, padding: '10px 14px', borderRadius: 12,
-              background: isCurrentDefault ? `rgba(99,102,241,0.06)` : M.s2,
-              border: `1px solid ${isCurrentDefault ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-              transition: 'all .2s',
-            }}>
-              <div style={{ fontSize: 12, color: isCurrentDefault ? M.primary : M.onSurfaceVar, fontWeight: isCurrentDefault ? 600 : 400 }}>
-                {isCurrentDefault ? '✓ This is your default card style' : 'Save color & style as default for new cards'}
-              </div>
-              {!isCurrentDefault && (
-                <button onClick={applyDefaultStyle} style={{
-                  padding: '5px 13px', borderRadius: R.full, flexShrink: 0,
-                  background: M.s3, color: M.onSurfaceVar,
-                  border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                }}>Set Default</button>
-              )}
-            </div>
-
-            {/* One-line name */}
-            <div style={{
-              marginBottom: 14, padding: '12px 14px', borderRadius: 12,
-              background: form.ellipsis ? `rgba(99,102,241,0.06)` : M.s2,
-              border: `1px solid ${form.ellipsis ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              transition: 'all .2s',
-            }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface, lineHeight: 1.3 }}>
-                  One-line name
-                  <span style={{
-                    marginLeft: 8, fontSize: 10, fontWeight: 700,
-                    padding: '2px 7px', borderRadius: R.full,
-                    background: form.ellipsis ? M.primary : M.s4,
-                    color: form.ellipsis ? '#fff' : M.onSurfaceVar,
-                    transition: 'all .2s',
-                  }}>{form.ellipsis ? 'ON' : 'OFF'}</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label="Storage (GB)" value={form.rom}
+                    onChange={e => setForm(v => ({ ...v, rom: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. 256" />
+                  <Field label="RAM (GB)" value={form.ram}
+                    onChange={e => setForm(v => ({ ...v, ram: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. 12" />
                 </div>
-                <div style={{ fontSize: 11, color: M.onSurfaceVar, marginTop: 2 }}>
-                  {form.ellipsis ? 'Long names truncated with …' : 'Names wrap to multiple lines'}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label="Price" value={form.price}
+                    onChange={e => setForm(v => ({ ...v, price: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. 999000" />
+                  <Field label="Original Price" value={form.oldPrice || ''}
+                    onChange={e => setForm(v => ({ ...v, oldPrice: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. 1200000" />
+                </div>
+                <div style={{
+                  padding: '10px 14px', borderRadius: 12,
+                  background: form.has5g ? 'rgba(26,115,232,0.06)' : M.s2,
+                  border: `1px solid ${form.has5g ? 'rgba(26,115,232,0.2)' : 'rgba(0,0,0,0.06)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>📶 5G</div>
+                  <Switch value={!!form.has5g} onChange={v => setForm(f => ({ ...f, has5g: v }))} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
+                    Featured Spec
+                  </div>
+                  <select className="ctrl-select"
+                    value={form.featuredSpec || ''}
+                    onChange={e => setForm(v => ({ ...v, featuredSpec: e.target.value }))}>
+                    <option value="">Auto (based on specs + price)</option>
+                    <option value="camera">📸 Camera Pro layout</option>
+                  </select>
                 </div>
               </div>
-              <Switch value={form.ellipsis} onChange={v => setForm(f => ({ ...f, ellipsis: v }))} />
-            </div>
+            )}
 
-            {/* Save to shelf */}
+            {/* Save to shelf — both styles */}
             <div style={{
               marginBottom: 16, padding: '12px 14px', borderRadius: 12,
               background: addToShelf ? `rgba(139,92,246,0.06)` : M.s2,
@@ -1009,16 +1089,24 @@ export default function App() {
               <Switch value={addToShelf} onChange={setAddToShelf} />
             </div>
 
-            {/* Live preview */}
+            {/* Live preview — both styles */}
             {form.name && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Preview</div>
-                <div style={{ maxWidth: 148 }}>
-                  <PriceTagCard p={{ ...form, id: 0 }} font={font}
-                    onClick={() => {}} onDelete={() => {}} onSave={() => {}}
-                    active={false} isDragging={false} dragOverClass=""
-                    onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
-                    onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                <div style={{ maxWidth: 180 }}>
+                  {cardStyle === 'classic' ? (
+                    <StickerCard p={{ ...form, id: 0 }} font={font}
+                      onClick={() => {}} onDelete={() => {}} onSave={() => {}}
+                      active={false} isDragging={false} dragOverClass=""
+                      onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
+                      onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                  ) : (
+                    <PriceTagCard p={{ ...form, id: 0 }} font={font}
+                      onClick={() => {}} onDelete={() => {}} onSave={() => {}}
+                      active={false} isDragging={false} dragOverClass=""
+                      onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
+                      onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                  )}
                 </div>
               </div>
             )}
@@ -1043,6 +1131,54 @@ export default function App() {
                   ? (addToShelf ? 'Add to Grid & Shelf ⭐' : 'Add Sticker')
                   : (addToShelf ? 'Save & Add to Shelf ⭐' : 'Save Changes')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Style Switch Warning Dialog ── */}
+      {pendingStyle !== null && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,12,50,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16, backdropFilter: 'blur(10px)' }}
+          onClick={() => setPendingStyle(null)}
+        >
+          <div
+            className="modal-card"
+            style={{ background: '#fff', borderRadius: 24, padding: '32px 24px 24px', width: '100%', maxWidth: 380, boxShadow: '0 32px 80px rgba(0,0,0,0.24)', border: `1px solid ${M.outlineVar}` }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: M.onSurface, textAlign: 'center', letterSpacing: -0.3, marginBottom: 10 }}>
+              Switch Card Style?
+            </div>
+            <div style={{ fontSize: 14, color: M.onSurfaceVar, textAlign: 'center', lineHeight: 1.65, marginBottom: 26 }}>
+              Switching to{' '}
+              <strong style={{ color: M.onSurface }}>
+                {pendingStyle === 'premium' ? '✨ Premium' : '🏷️ Classic'}
+              </strong>{' '}
+              will remove all{' '}
+              <strong style={{ color: M.error }}>{products.length}</strong>{' '}
+              card{products.length !== 1 ? 's' : ''} from the grid.
+              <br />This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setPendingStyle(null)}
+                style={{
+                  flex: 1, padding: '12px 0', borderRadius: R.full,
+                  border: `1.5px solid ${M.outlineVar}`, background: '#fff',
+                  color: M.onSurface, fontSize: 14, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                }}>Cancel</button>
+              <button
+                onClick={() => applyStyleChange(pendingStyle)}
+                style={{
+                  flex: 2, padding: '12px 0', borderRadius: R.full, border: 'none',
+                  background: M.error, color: M.onError,
+                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  fontFamily: 'inherit', transition: 'all .15s',
+                  boxShadow: '0 4px 14px rgba(204,0,0,0.35)',
+                }}>Clear Grid & Switch</button>
             </div>
           </div>
         </div>

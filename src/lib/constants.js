@@ -62,7 +62,7 @@ export const FONTS = [
   { name: 'Sora',           css: 'Sora:wght@400;700;800'           },
 ];
 
-export const GRID_OPTIONS = [3, 4, 5];
+export const GRID_OPTIONS = [2, 3, 4, 5];
 
 /* ─── Paper sizes (200 DPI pixel dimensions) ────────────────── */
 export const PAPER_SIZES = [

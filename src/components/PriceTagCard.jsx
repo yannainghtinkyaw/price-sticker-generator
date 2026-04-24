@@ -16,7 +16,7 @@ const LAYOUTS = { 1: L1, 2: L2, 3: L3, 4: L4, 5: L5, 6: L6, 7: L7, 8: L8, 9: L9,
 
 export default function PriceTagCard({
   p, font, onClick, onDelete, onSave, active,
-  isDragging, dragOverClass,
+  isDragging, dragOverClass, thumbnail = false,
   onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop,
   ...rest
 }) {
@@ -31,13 +31,12 @@ export default function PriceTagCard({
 
   const Layout = LAYOUTS[theme.layout] ?? L1;
 
-  /* Trigger fade+scale only when layout number changes */
   const layoutChanged = prevLayoutRef.current !== null && prevLayoutRef.current !== theme.layout;
   prevLayoutRef.current = theme.layout;
 
   return (
     <div
-      draggable
+      draggable={!thumbnail}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
@@ -45,25 +44,25 @@ export default function PriceTagCard({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
+      onMouseEnter={() => !thumbnail && setHov(true)}
+      onMouseLeave={() => !thumbnail && setHov(false)}
       className={`${isDragging ? 'dc' : ''} ${dragOverClass || ''}`}
       style={{
         position:   'relative',
-        cursor:     'grab',
+        cursor:     thumbnail ? 'default' : 'grab',
         userSelect: 'none',
         fontFamily: `'${font}', sans-serif`,
         outline:    active ? '2.5px solid rgba(99,102,241,0.6)' : 'none',
         outlineOffset: 3,
         borderRadius: 13,
-        transition: 'transform 0.18s, box-shadow 0.18s',
+        transition: thumbnail ? undefined : 'transform 0.18s, box-shadow 0.18s',
         transform:  hov && !isDragging ? 'translateY(-2px) scale(1.02)' : 'scale(1)',
         boxShadow:  hov && !isDragging ? '0 8px 28px rgba(0,0,0,0.18)' : 'none',
       }}
       {...rest}
     >
-      {/* Save to shelf ★ */}
-      {hov && (
+      {/* Save to shelf ★ — hidden in thumbnail mode */}
+      {!thumbnail && hov && (
         <button
           onClick={e => { e.stopPropagation(); onSave(); }}
           title="Save to shelf"
@@ -78,8 +77,8 @@ export default function PriceTagCard({
         </button>
       )}
 
-      {/* Drag handle */}
-      {hov && (
+      {/* Drag handle — hidden in thumbnail mode */}
+      {!thumbnail && hov && (
         <div style={{
           position: 'absolute', bottom: 6, right: 30, zIndex: 10,
           background: 'rgba(0,0,0,0.45)', color: '#fff',
@@ -90,21 +89,23 @@ export default function PriceTagCard({
         </div>
       )}
 
-      {/* Delete ✕ */}
-      <button
-        onClick={e => { e.stopPropagation(); onDelete(); }}
-        title="Delete"
-        style={{
-          position: 'absolute', top: 6, right: 6, zIndex: 10,
-          width: 22, height: 22, borderRadius: 6, border: 'none',
-          background: 'rgba(0,0,0,0.45)', color: '#fff',
-          fontSize: 11, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: hov ? 1 : 0.4, transition: 'opacity 0.15s',
-          backdropFilter: 'blur(4px)',
-        }}>
-        ✕
-      </button>
+      {/* Delete ✕ — hidden in thumbnail mode */}
+      {!thumbnail && (
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(); }}
+          title="Delete"
+          style={{
+            position: 'absolute', top: 6, right: 6, zIndex: 10,
+            width: 22, height: 22, borderRadius: 6, border: 'none',
+            background: 'rgba(0,0,0,0.45)', color: '#fff',
+            fontSize: 11, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: hov ? 1 : 0.4, transition: 'opacity 0.15s',
+            backdropFilter: 'blur(4px)',
+          }}>
+          ✕
+        </button>
+      )}
 
       {/* Layout — key change triggers cardSwap animation */}
       <div
