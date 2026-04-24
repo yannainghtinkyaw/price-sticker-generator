@@ -76,9 +76,20 @@ export const PAPER_SIZES = [
 
 /* ─── Default data ──────────────────────────────────────────── */
 export const INITIAL = [
-  { id: 1, name: 'Infinix Note Edge 5G', ram: '8+8', rom: '128', battery: '6500', price: '7490', theme: 0, filled: false },
+  {
+    id: 1, name: 'Infinix Note Edge 5G', brand: 'Infinix',
+    ram: '8+8', rom: '128', battery: '6500',
+    camera: '50', chip: 'Helio G99', display: '6.78', has5g: true,
+    price: '7490', oldPrice: '8990', featuredSpec: '',
+    theme: 0, filled: false, ellipsis: false,
+  },
 ];
 
-export const EMPTY = { name: '', ram: '', rom: '', battery: '', price: '', theme: 0, filled: false, ellipsis: false };
+export const EMPTY = {
+  name: '', brand: '', ram: '', rom: '', battery: '',
+  camera: '', chip: '', display: '', has5g: false,
+  price: '', oldPrice: '', featuredSpec: '',
+  theme: 0, filled: false, ellipsis: false,
+};
 
 export const PER_PAGE = 15;
