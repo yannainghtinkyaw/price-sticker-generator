@@ -1164,6 +1164,14 @@ export default function App() {
         </div>
       )}
 
+      <CardStylePickerDialog
+        open={stylePickerOpen}
+        current={cardStyle}
+        onSelect={handleStyleChange}
+        onClose={() => setStylePickerOpen(false)}
+        font={font}
+      />
+
       {/* ── Style Switch Warning Dialog ── */}
       {pendingStyle !== null && (
         <div
