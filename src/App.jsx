@@ -7,7 +7,7 @@ import Field        from './components/Field.jsx';
 import Snack        from './components/Snack.jsx';
 import StyleToggle  from './components/StyleToggle.jsx';
 import ShelfCard    from './components/ShelfCard.jsx';
-import StickerCard  from './components/StickerCard.jsx';
+import PriceTagCard from './components/PriceTagCard.jsx';
 import ShelfPickDialog   from './dialogs/ShelfPickDialog.jsx';
 import CsvDialog         from './dialogs/CsvDialog.jsx';
 import TemplatesDialog   from './dialogs/TemplatesDialog.jsx';
@@ -147,7 +147,13 @@ export default function App() {
     }
   }
   function openEdit(p) {
-    setForm({ name: p.name, ram: p.ram, rom: p.rom, battery: p.battery, price: p.price, theme: p.theme, filled: !!p.filled, ellipsis: !!p.ellipsis });
+    setForm({
+      name: p.name, brand: p.brand || '', ram: p.ram, rom: p.rom,
+      battery: p.battery, camera: p.camera || '', chip: p.chip || '',
+      display: p.display || '', has5g: !!p.has5g,
+      price: p.price, oldPrice: p.oldPrice || '', featuredSpec: p.featuredSpec || '',
+      theme: p.theme, filled: !!p.filled, ellipsis: !!p.ellipsis,
+    });
     setAddToShelf(false); setModal(p.id);
   }
 
@@ -175,7 +181,13 @@ export default function App() {
     setProducts([]); setPage(0); setClearConfirm(false); showToast('Grid cleared');
   }
   function saveCardToShelf(p) {
-    setSavedCards(prev => [...prev, { name: p.name, ram: p.ram, rom: p.rom, battery: p.battery, price: p.price, theme: p.theme, filled: p.filled, savedId: Date.now() }]);
+    setSavedCards(prev => [...prev, {
+      name: p.name, brand: p.brand, ram: p.ram, rom: p.rom,
+      battery: p.battery, camera: p.camera, chip: p.chip,
+      display: p.display, has5g: p.has5g,
+      price: p.price, oldPrice: p.oldPrice, featuredSpec: p.featuredSpec,
+      theme: p.theme, filled: p.filled, savedId: Date.now(),
+    }]);
     showToast('⭐ Saved to shelf!');
   }
   function removeSavedCard(savedId) { setSavedCards(prev => prev.filter(s => s.savedId !== savedId)); }
@@ -726,7 +738,7 @@ export default function App() {
         <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowSm }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
             {pageProds.map(p => (
-              <StickerCard key={p.id} p={p} font={font}
+              <PriceTagCard key={p.id} p={p} font={font}
                 onClick={() => { if (!isDragging) openEdit(p); }}
                 onDelete={() => remove(p.id)}
                 onSave={() => saveCardToShelf(p)}
@@ -846,6 +858,74 @@ export default function App() {
               ))}
             </div>
 
+            {/* ── Phone Details (premium layout fields) ── */}
+            <div style={{ borderTop: `1px solid ${M.outlineVar}`, paddingTop: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar,
+                letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>
+                Phone Details
+              </div>
+
+              {/* Brand */}
+              <div style={{ marginBottom: 10 }}>
+                <Field label="Brand" value={form.brand || ''}
+                  onChange={e => setForm(v => ({ ...v, brand: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. Samsung" />
+              </div>
+
+              {/* Camera + Chip */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <Field label="Camera (MP)" value={form.camera || ''}
+                  onChange={e => setForm(v => ({ ...v, camera: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. 50" />
+                <Field label="Chip" value={form.chip || ''}
+                  onChange={e => setForm(v => ({ ...v, chip: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder='e.g. SD 8 Gen 3' />
+              </div>
+
+              {/* Display + Old Price */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <Field label='Display (")' value={form.display || ''}
+                  onChange={e => setForm(v => ({ ...v, display: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. 6.7" />
+                <Field label="Original Price" value={form.oldPrice || ''}
+                  onChange={e => setForm(v => ({ ...v, oldPrice: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. 9990" />
+              </div>
+
+              {/* Has 5G */}
+              <div style={{
+                marginBottom: 10, padding: '10px 14px', borderRadius: 12,
+                background: form.has5g ? 'rgba(26,115,232,0.06)' : M.s2,
+                border: `1px solid ${form.has5g ? 'rgba(26,115,232,0.2)' : 'rgba(0,0,0,0.06)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>
+                  5G Connectivity
+                </div>
+                <Switch value={!!form.has5g} onChange={v => setForm(f => ({ ...f, has5g: v }))} />
+              </div>
+
+              {/* Featured Spec */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar,
+                  letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
+                  Featured Spec (forces Camera Pro layout)
+                </div>
+                <select className="ctrl-select"
+                  value={form.featuredSpec || ''}
+                  onChange={e => setForm(v => ({ ...v, featuredSpec: e.target.value }))}>
+                  <option value="">Auto-detect</option>
+                  <option value="camera">📸 Camera</option>
+                  <option value="battery">🔋 Battery</option>
+                </select>
+              </div>
+            </div>
+
             {/* Colour picker */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
@@ -934,7 +1014,7 @@ export default function App() {
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Preview</div>
                 <div style={{ maxWidth: 148 }}>
-                  <StickerCard p={{ ...form, id: 0 }} font={font}
+                  <PriceTagCard p={{ ...form, id: 0 }} font={font}
                     onClick={() => {}} onDelete={() => {}} onSave={() => {}}
                     active={false} isDragging={false} dragOverClass=""
                     onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
