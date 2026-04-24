@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { M, R, THEMES, FONTS, GRID_OPTIONS, PAPER_SIZES, INITIAL, EMPTY, PER_PAGE } from './lib/constants.js';
+import { M, R, THEMES, FONTS, GRID_OPTIONS, PAPER_SIZES, INITIAL, EMPTY, PER_PAGE, CARD_STYLES } from './lib/constants.js';
 import { rrect, drawSticker } from './lib/canvas.js';
 import Btn          from './components/Btn.jsx';
 import Switch       from './components/Switch.jsx';
@@ -9,9 +9,10 @@ import StyleToggle  from './components/StyleToggle.jsx';
 import ShelfCard    from './components/ShelfCard.jsx';
 import StickerCard  from './components/StickerCard.jsx';
 import PriceTagCard from './components/PriceTagCard.jsx';
-import ShelfPickDialog   from './dialogs/ShelfPickDialog.jsx';
-import CsvDialog         from './dialogs/CsvDialog.jsx';
-import TemplatesDialog   from './dialogs/TemplatesDialog.jsx';
+import ShelfPickDialog        from './dialogs/ShelfPickDialog.jsx';
+import CsvDialog              from './dialogs/CsvDialog.jsx';
+import TemplatesDialog        from './dialogs/TemplatesDialog.jsx';
+import CardStylePickerDialog  from './dialogs/CardStylePickerDialog.jsx';
 
 /* ── localStorage helpers ───────────────────────────────────── */
 function lsGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -63,7 +64,8 @@ export default function App() {
   const [templates,     setTemplates]     = useState([]);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [defaultStyle,  setDefaultStyle]  = useState({ theme: 0, filled: false, ellipsis: false });
-  const [cardStyle,     setCardStyle]     = useState('classic');
+  const [cardStyle,     setCardStyle]     = useState(0);
+  const [stylePickerOpen, setStylePickerOpen] = useState(false);
   const [pendingStyle,  setPendingStyle]  = useState(null);
 
   const canvasRef           = useRef(null);
@@ -77,7 +79,14 @@ export default function App() {
   /* ── cardStyle persistence ──────────────────────────────────── */
   useEffect(() => {
     const v = lsGet('pts_card_style');
-    if (v === 'classic' || v === 'premium') setCardStyle(v);
+    if (v !== null) {
+      if (v === 'classic') { setCardStyle(0); }
+      else if (v === 'premium') { setCardStyle(1); }
+      else {
+        const n = Number(v);
+        if (!isNaN(n) && n >= 0 && n <= 10) setCardStyle(n);
+      }
+    }
     cardStyleInitRef.current = true;
   }, []);
   useEffect(() => {
@@ -91,7 +100,7 @@ export default function App() {
   const paper       = PAPER_SIZES.find(s => s.id === paperSize) || PAPER_SIZES[1];
   const isDragging  = dragSrcId !== null;
   const activeColor = THEMES[form.theme]?.color || M.primary;
-  const canSave = cardStyle === 'classic'
+  const canSave = cardStyle === 0
     ? !!(form.name && form.rom && form.battery && form.price)
     : !!(form.name && form.price);
   const isCurrentDefault =
@@ -247,14 +256,15 @@ export default function App() {
 
   /* ── Card style switch ──────────────────────────────────────── */
   function handleStyleChange(newStyle) {
-    if (newStyle === cardStyle) return;
+    if (newStyle === cardStyle) { setStylePickerOpen(false); return; }
+    setStylePickerOpen(false);
     if (products.length > 0) { setPendingStyle(newStyle); return; }
     applyStyleChange(newStyle);
   }
   function applyStyleChange(style) {
     setCardStyle(style);
     setProducts([]); setPage(0); setPendingStyle(null);
-    showToast(`Switched to ${style === 'classic' ? 'Classic' : 'Premium'} style`);
+    showToast(`Switched to ${CARD_STYLES[style]?.name ?? style}`);
   }
 
   /* ── Default card style helper ──────────────────────────────── */
@@ -352,7 +362,7 @@ export default function App() {
     const { w: W, h: H } = paper;
 
     /* Premium: capture DOM grid with html2canvas */
-    if (cardStyle === 'premium') {
+    if (cardStyle > 0) {
       const el = premiumGridRef.current;
       if (!el) { showToast('⚠️ Grid not ready'); return null; }
       await new Promise(r => setTimeout(r, 400)); // let fonts settle
@@ -658,10 +668,27 @@ export default function App() {
           {/* Row 0: Card Style */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Card Style</div>
-            <select className="ctrl-select" value={cardStyle} onChange={e => handleStyleChange(e.target.value)}>
-              <option value="classic">🏷️ Classic — simple price tag (default)</option>
-              <option value="premium">✨ Premium — 10 phone layouts, auto-selected</option>
-            </select>
+            <button
+              onClick={() => setStylePickerOpen(true)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', borderRadius: 10,
+                border: '1.5px solid rgba(0,0,0,0.12)', background: '#fff',
+                cursor: 'pointer', fontFamily: 'inherit',
+                transition: 'border-color .15s, box-shadow .15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.3)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)'; }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20, lineHeight: 1 }}>{CARD_STYLES[cardStyle]?.emoji}</span>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: M.onSurface }}>{CARD_STYLES[cardStyle]?.name}</div>
+                  <div style={{ fontSize: 10, color: M.onSurfaceVar }}>{CARD_STYLES[cardStyle]?.desc}</div>
+                </div>
+              </div>
+              <IcChevDown s={16} />
+            </button>
           </div>
 
           {/* Row 1: Font (full width) */}
@@ -807,13 +834,14 @@ export default function App() {
         <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowSm }}>
           <div ref={premiumGridRef} style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
             {pageProds.map(p => {
-              const CardComp = cardStyle === 'premium' ? PriceTagCard : StickerCard;
+              const CardComp = cardStyle === 0 ? StickerCard : PriceTagCard;
               return (
               <CardComp key={p.id} p={p} font={font}
                 onClick={() => { if (!isDragging) openEdit(p); }}
                 onDelete={() => remove(p.id)}
                 onSave={() => saveCardToShelf(p)}
                 active={modal === p.id}
+                {...(cardStyle > 0 ? { layout: cardStyle } : {})}
                 {...cdp(p)} />
               );
             })}
@@ -902,7 +930,7 @@ export default function App() {
             </div>
 
             {/* ── CLASSIC fields ── */}
-            {cardStyle === 'classic' && (<>
+            {cardStyle === 0 && (<>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                 {[
                   { label: 'Product Name',       key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
@@ -1001,7 +1029,7 @@ export default function App() {
             </>)}
 
             {/* ── PREMIUM fields ── */}
-            {cardStyle === 'premium' && (
+            {cardStyle > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
                 <Field label="Brand" value={form.brand || ''}
                   onChange={e => setForm(v => ({ ...v, brand: e.target.value }))}
@@ -1094,14 +1122,14 @@ export default function App() {
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Preview</div>
                 <div style={{ maxWidth: 180 }}>
-                  {cardStyle === 'classic' ? (
+                  {cardStyle === 0 ? (
                     <StickerCard p={{ ...form, id: 0 }} font={font}
                       onClick={() => {}} onDelete={() => {}} onSave={() => {}}
                       active={false} isDragging={false} dragOverClass=""
                       onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
                       onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
                   ) : (
-                    <PriceTagCard p={{ ...form, id: 0 }} font={font}
+                    <PriceTagCard p={{ ...form, id: 0 }} font={font} layout={cardStyle}
                       onClick={() => {}} onDelete={() => {}} onSave={() => {}}
                       active={false} isDragging={false} dragOverClass=""
                       onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
@@ -1154,7 +1182,7 @@ export default function App() {
             <div style={{ fontSize: 14, color: M.onSurfaceVar, textAlign: 'center', lineHeight: 1.65, marginBottom: 26 }}>
               Switching to{' '}
               <strong style={{ color: M.onSurface }}>
-                {pendingStyle === 'premium' ? '✨ Premium' : '🏷️ Classic'}
+                {CARD_STYLES[pendingStyle]?.emoji} {CARD_STYLES[pendingStyle]?.name}
               </strong>{' '}
               will remove all{' '}
               <strong style={{ color: M.error }}>{products.length}</strong>{' '}

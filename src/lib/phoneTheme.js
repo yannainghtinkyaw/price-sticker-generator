@@ -1,23 +1,34 @@
 /* ── Layout selection ──────────────────────────────────────────── */
-export function getCardTheme(phone) {
+const BADGE_FOR_LAYOUT = {
+  1: 'FLAGSHIP', 2: 'NEW ARRIVAL', 3: 'BATTERY', 4: 'CAMERA PRO',
+  5: 'FLASH DEAL', 6: 'LUXURY', 7: 'TOP RATED', 8: 'GAMING', 9: 'VALUE', 10: 'OFFER',
+};
+
+export function getCardTheme(phone, forcedLayout = 0) {
   const price    = Number(phone.price)    || 0;
   const oldPrice = Number(phone.oldPrice) || 0;
-  const battery  = Number(phone.battery)  || 0;
   const discount = oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : 0;
-  const brand    = String(phone.brand || '').trim().toLowerCase();
-  const featured = phone.featuredSpec || '';
+
+  if (forcedLayout > 0) {
+    return { layout: forcedLayout, badgeText: BADGE_FOR_LAYOUT[forcedLayout] || 'FEATURED', discount };
+  }
+
+  // Auto-select (legacy / when forcedLayout=0)
+  const battery   = Number(phone.battery)  || 0;
+  const brand     = String(phone.brand || '').trim().toLowerCase();
+  const featured  = phone.featuredSpec || '';
   const specCount = [phone.camera, phone.chip, phone.display, phone.has5g].filter(Boolean).length;
 
-  if (price >= 1500000)                    return { layout: 6,  badgeText: 'LUXURY',      discount };
-  if (discount >= 20)                      return { layout: 5,  badgeText: 'FLASH DEAL',  discount };
-  if (battery >= 5500)                     return { layout: 3,  badgeText: 'BATTERY',     discount };
-  if (/asus.?rog/i.test(brand))           return { layout: 8,  badgeText: 'GAMING',      discount };
-  if (featured === 'camera')               return { layout: 4,  badgeText: 'CAMERA PRO',  discount };
-  if (price > 0 && price <= 500000)        return { layout: 9,  badgeText: 'VALUE',       discount };
-  if (/^apple$/i.test(brand))             return { layout: 2,  badgeText: 'NEW ARRIVAL', discount };
-  if (specCount >= 3 && discount > 0)      return { layout: 10, badgeText: 'OFFER',       discount };
-  if (specCount >= 3)                      return { layout: 7,  badgeText: 'TOP RATED',   discount };
-  return                                          { layout: 1,  badgeText: 'FLAGSHIP',    discount };
+  if (price >= 1500000)               return { layout: 6,  badgeText: 'LUXURY',      discount };
+  if (discount >= 20)                 return { layout: 5,  badgeText: 'FLASH DEAL',  discount };
+  if (battery >= 5500)                return { layout: 3,  badgeText: 'BATTERY',     discount };
+  if (/asus.?rog/i.test(brand))      return { layout: 8,  badgeText: 'GAMING',      discount };
+  if (featured === 'camera')          return { layout: 4,  badgeText: 'CAMERA PRO',  discount };
+  if (price > 0 && price <= 500000)   return { layout: 9,  badgeText: 'VALUE',       discount };
+  if (/^apple$/i.test(brand))        return { layout: 2,  badgeText: 'NEW ARRIVAL', discount };
+  if (specCount >= 3 && discount > 0) return { layout: 10, badgeText: 'OFFER',       discount };
+  if (specCount >= 3)                 return { layout: 7,  badgeText: 'TOP RATED',   discount };
+  return                                     { layout: 1,  badgeText: 'FLAGSHIP',    discount };
 }
 
 /* ── Spec priority list ────────────────────────────────────────── */

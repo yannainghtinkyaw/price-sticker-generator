@@ -16,14 +16,14 @@ const LAYOUTS = { 1: L1, 2: L2, 3: L3, 4: L4, 5: L5, 6: L6, 7: L7, 8: L8, 9: L9,
 
 export default function PriceTagCard({
   p, font, onClick, onDelete, onSave, active,
-  isDragging, dragOverClass, thumbnail = false,
+  isDragging, dragOverClass, thumbnail = false, layout = 0,
   onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop,
   ...rest
 }) {
   const [hov, setHov]       = useState(false);
   const prevLayoutRef        = useRef(null);
 
-  const theme  = getCardTheme(p);
+  const theme  = getCardTheme(p, layout);
   const specs  = getPrioritySpecs(p, 4);
   const specs6 = getPrioritySpecs(p, 6);
   const brand  = parseBrand(p);

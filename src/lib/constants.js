@@ -93,3 +93,17 @@ export const EMPTY = {
 };
 
 export const PER_PAGE = 15;
+
+export const CARD_STYLES = [
+  { id: 0,  name: 'Classic',        emoji: '🏷️',  desc: 'Simple price tag'        },
+  { id: 1,  name: 'Dark Hero',      emoji: '🌑',  desc: 'Dark flagship style'      },
+  { id: 2,  name: 'Bright Card',    emoji: '☀️',  desc: 'Clean white shimmer'      },
+  { id: 3,  name: 'Battery Focus',  emoji: '🔋',  desc: 'Battery hero layout'      },
+  { id: 4,  name: 'Camera Pro',     emoji: '📸',  desc: 'Camera highlight'         },
+  { id: 5,  name: 'Flash Deal',     emoji: '⚡',  desc: 'Limited time offer'       },
+  { id: 6,  name: 'Luxury Gold',    emoji: '✨',  desc: 'Premium elegant'          },
+  { id: 7,  name: 'Spec Grid',      emoji: '📊',  desc: '6-spec comparison grid'   },
+  { id: 8,  name: 'Neon Glow',      emoji: '🌟',  desc: 'Gaming neon aesthetic'    },
+  { id: 9,  name: 'Minimal Split',  emoji: '⚪',  desc: 'Clean split with bars'    },
+  { id: 10, name: 'Mega Splash',    emoji: '💥',  desc: 'Bold offer banner'        },
+];

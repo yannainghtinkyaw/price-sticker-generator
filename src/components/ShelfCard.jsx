@@ -9,7 +9,7 @@ export default function ShelfCard({ s, font, cardStyle, onAdd, onRemove, onDragS
   const [hov, setHov] = useState(false);
 
   /* ── Premium thumbnail ─────────────────────────────────────── */
-  if (cardStyle === 'premium') {
+  if (cardStyle > 0) {
     return (
       <div
         draggable
@@ -44,6 +44,7 @@ export default function ShelfCard({ s, font, cardStyle, onAdd, onRemove, onDragS
           <PriceTagCard
             p={{ ...s, id: s.savedId ?? 0 }}
             font={font}
+            layout={cardStyle}
             thumbnail
             onClick={() => {}} onDelete={() => {}} onSave={() => {}}
             active={false} isDragging={false} dragOverClass=""
