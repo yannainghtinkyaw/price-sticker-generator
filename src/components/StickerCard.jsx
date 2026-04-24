@@ -33,7 +33,7 @@ export default function StickerCard({
       onMouseLeave={() => setHov(false)}
       className={`${isDragging ? 'dc' : ''} ${dragOverClass || ''}`}
       style={{
-        border:       active ? `2px solid ${c}` : (filled ? 'none' : `1px solid ${c}22`),
+        border:       active ? `2px solid ${c}` : (filled ? 'none' : `1.5px solid ${c}`),
         borderRadius: 14,
         padding:      '13px 10px 11px',
         background:   filled
@@ -140,7 +140,7 @@ export default function StickerCard({
         RAM {p.ram} / ROM {p.rom} GB
       </div>
       <div style={{ fontSize: 9.5, color: fg, textAlign: 'center', opacity: .75 }}>
-        🔋 {p.battery} mAh
+        {p.battery} mAh
       </div>
 
       {/* Price badge */}
