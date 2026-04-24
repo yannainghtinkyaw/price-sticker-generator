@@ -584,17 +584,17 @@ export default function App() {
         {/* ── Controls Panel ── */}
         <div style={{ background: '#fff', borderRadius: 20, padding: '18px 20px', marginBottom: 16, border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowMd }}>
 
-          {/* Row 1: Font | Columns | Paper */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 140px', gap: 12, marginBottom: 14 }}>
+          {/* Row 1: Font (full width) */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Font</div>
+            <select className="ctrl-select" value={font} onChange={e => setFont(e.target.value)}
+              style={{ fontFamily: `'${font}', sans-serif`, width: '100%' }}>
+              {FONTS.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+            </select>
+          </div>
 
-            {/* Font dropdown */}
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Font</div>
-              <select className="ctrl-select" value={font} onChange={e => setFont(e.target.value)}
-                style={{ fontFamily: `'${font}', sans-serif` }}>
-                {FONTS.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
-              </select>
-            </div>
+          {/* Row 2: Columns | Paper */}
+          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, marginBottom: 14 }}>
 
             {/* Columns dropdown */}
             <div>
@@ -819,16 +819,30 @@ export default function App() {
             {/* Fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
               {[
-                { label: 'Product Name',     key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
-                { label: 'RAM (GB)',          key: 'ram',     ph: 'e.g. 8 or 8+8' },
-                { label: 'Storage / ROM (GB)', key: 'rom',   ph: 'e.g. 256' },
-                { label: 'Battery (mAh)',     key: 'battery', ph: 'e.g. 5000' },
-                { label: 'Price (THB)',       key: 'price',   ph: 'e.g. 9990' },
+                { label: 'Product Name',       key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
+                { label: 'RAM (GB)',            key: 'ram',     ph: 'e.g. 8 or 8+8',  tag: v => `RAM: ${v} GB` },
+                { label: 'Storage / ROM (GB)', key: 'rom',     ph: 'e.g. 256',        tag: v => `ROM: ${v} GB` },
+                { label: 'Battery (mAh)',       key: 'battery', ph: 'e.g. 5000' },
+                { label: 'Price (THB)',         key: 'price',   ph: 'e.g. 9990' },
               ].map(f => (
-                <Field key={f.key} label={f.label} value={form[f.key]}
-                  onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder={f.ph} />
+                <div key={f.key}>
+                  <Field label={f.label} value={form[f.key]}
+                    onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder={f.ph} />
+                  {f.tag && form[f.key] && (
+                    <div style={{ marginTop: 5 }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '3px 10px', borderRadius: 20,
+                        fontSize: 11, fontWeight: 700,
+                        background: `${THEMES[form.theme].color}18`,
+                        color: THEMES[form.theme].color,
+                        border: `1px solid ${THEMES[form.theme].color}40`,
+                      }}>{f.tag(form[f.key])}</span>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
 
