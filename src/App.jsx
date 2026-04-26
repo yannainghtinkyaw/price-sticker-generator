@@ -1300,7 +1300,7 @@ export default function App() {
       onDragEnd: resetDrag,
       onDragOver: (event) => {
         event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
+        event.dataTransfer.dropEffect = dragState?.type === "grid" ? "move" : "copy";
       },
       onDragEnter: (event) => {
         event.preventDefault();
@@ -1677,7 +1677,7 @@ export default function App() {
                         }}
                         onDragOver={(event) => {
                           event.preventDefault();
-                          event.dataTransfer.dropEffect = "copy";
+                          event.dataTransfer.dropEffect = dragState?.type === "grid" ? "move" : "copy";
                         }}
                         onDragEnter={(event) => {
                           event.preventDefault();
