@@ -37,6 +37,28 @@ function IcGrid({ s = 16 }) {
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
 }
 
+const CARD_STYLES = [
+  { key: 'classic', icon: '🏷️', name: 'Classic',       desc: 'Simple price tag',        layout: null },
+  { key: 'L1',      icon: '⚫', name: 'Dark Hero',      desc: 'Dark flagship style',     layout: 1    },
+  { key: 'L2',      icon: '🌟', name: 'Bright Card',    desc: 'Clean white shimmer',     layout: 2    },
+  { key: 'L3',      icon: '🔋', name: 'Battery Focus',  desc: 'Battery hero layout',     layout: 3    },
+  { key: 'L4',      icon: '📸', name: 'Camera Pro',     desc: 'Camera highlight',        layout: 4    },
+  { key: 'L5',      icon: '⚡', name: 'Flash Deal',     desc: 'Limited time offer',      layout: 5    },
+  { key: 'L6',      icon: '✨', name: 'Luxury Gold',    desc: 'Premium elegant',         layout: 6    },
+  { key: 'L7',      icon: '📊', name: 'Spec Grid',      desc: '6-spec comparison grid',  layout: 7    },
+  { key: 'L8',      icon: '🌙', name: 'Neon Glow',      desc: 'Gaming neon aesthetic',   layout: 8    },
+  { key: 'L9',      icon: '📋', name: 'Minimal Split',  desc: 'Clean split with bars',   layout: 9    },
+  { key: 'L10',     icon: '💥', name: 'Mega Splash',    desc: 'Bold offer banner',       layout: 10   },
+];
+const STYLE_PREV = {
+  id: 0, name: 'Samsung Galaxy S25 Ultra', brand: 'Samsung',
+  ram: '12', rom: '256', battery: '5000',
+  camera: '200', chip: 'Snapdragon 8 Gen 3', display: '6.8',
+  has5g: true, price: '49900', oldPrice: '55000',
+  featuredSpec: '', theme: 0, filled: false, ellipsis: false,
+  classic: false, romColor: '', batteryColor: '',
+};
+
 export default function App() {
   const [products,      setProducts]      = useState(INITIAL);
   const [font,          setFont]          = useState('Kanit');
@@ -63,7 +85,8 @@ export default function App() {
   const [templates,     setTemplates]     = useState([]);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [defaultStyle,  setDefaultStyle]  = useState({ theme: 0, filled: false, ellipsis: false });
-  const [cardStyle,     setCardStyle]     = useState('premium');
+  const [cardStyle,       setCardStyle]       = useState('classic');
+  const [stylePickerOpen, setStylePickerOpen] = useState(false);
 
   const canvasRef           = useRef(null);
   const savedLoadedRef      = useRef(false);
@@ -610,24 +633,28 @@ export default function App() {
             </select>
           </div>
 
-          {/* Card Style toggle */}
+          {/* Card Style dropdown */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Card Style</div>
-            <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${M.outlineVar}` }}>
-              {[
-                { key: 'premium', label: '✨ Premium Dynamic' },
-                { key: 'classic', label: '🏷️ Classic Simple'  },
-              ].map(({ key, label }) => (
-                <button key={key} onClick={() => setCardStyle(key)}
-                  style={{
-                    flex: 1, padding: '8px 6px', border: 'none',
-                    background: cardStyle === key ? M.gradient : '#fff',
-                    color:      cardStyle === key ? '#fff' : M.onSurfaceVar,
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    fontFamily: 'inherit', transition: 'all .15s',
-                  }}>{label}</button>
-              ))}
-            </div>
+            {(() => {
+              const cs = CARD_STYLES.find(x => x.key === cardStyle) || CARD_STYLES[0];
+              return (
+                <button onClick={() => setStylePickerOpen(true)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px', borderRadius: 10,
+                  border: `1px solid ${M.outlineVar}`, background: '#fff',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                  transition: 'all .15s', boxShadow: M.shadowSm,
+                }}>
+                  <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{cs.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: M.onSurface }}>{cs.name}</div>
+                    <div style={{ fontSize: 11, color: M.onSurfaceVar }}>{cs.desc}</div>
+                  </div>
+                  <IcChevDown s={16} />
+                </button>
+              );
+            })()}
           </div>
 
           {/* Row 2: Columns | Paper */}
@@ -762,21 +789,23 @@ export default function App() {
         {/* ── Sticker Grid ── */}
         <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowSm }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
-            {pageProds.map(p => (
-              p.classic
-                ? <StickerCard key={p.id} p={p} font={font}
-                    onClick={() => { if (!isDragging) openEdit(p); }}
-                    onDelete={() => remove(p.id)}
-                    onSave={() => saveCardToShelf(p)}
-                    active={modal === p.id}
-                    {...cdp(p)} />
-                : <PriceTagCard key={p.id} p={p} font={font}
-                    onClick={() => { if (!isDragging) openEdit(p); }}
-                    onDelete={() => remove(p.id)}
-                    onSave={() => saveCardToShelf(p)}
-                    active={modal === p.id}
-                    {...cdp(p)} />
-            ))}
+            {pageProds.map(p => {
+              const fl = CARD_STYLES.find(x => x.key === cardStyle)?.layout ?? null;
+              if (cardStyle === 'classic') {
+                return <StickerCard key={p.id} p={p} font={font}
+                  onClick={() => { if (!isDragging) openEdit(p); }}
+                  onDelete={() => remove(p.id)}
+                  onSave={() => saveCardToShelf(p)}
+                  active={modal === p.id}
+                  {...cdp(p)} />;
+              }
+              return <PriceTagCard key={p.id} p={p} font={font} forcedLayout={fl}
+                onClick={() => { if (!isDragging) openEdit(p); }}
+                onDelete={() => remove(p.id)}
+                onSave={() => saveCardToShelf(p)}
+                active={modal === p.id}
+                {...cdp(p)} />;
+            })}
             {Array.from({ length: emptySlots }).map((_, i) => (
               <div key={`e${i}`}
                 data-emptyslot="1"
@@ -847,6 +876,82 @@ export default function App() {
         }}
         onRemoveShelf={removeSavedCard}
       />
+
+      {/* ── Card Style Picker (bottom sheet) ── */}
+      {stylePickerOpen && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1500, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+          onClick={() => setStylePickerOpen(false)}>
+          <div
+            style={{ background: '#fff', borderRadius: '24px 24px 0 0', maxHeight: '88vh', overflowY: 'auto', paddingBottom: 32 }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '20px 20px 14px' }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: M.onSurface, letterSpacing: -0.3 }}>Card Style</div>
+                <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Choose how your price tags look</div>
+              </div>
+              <button onClick={() => setStylePickerOpen(false)} style={{
+                width: 36, height: 36, borderRadius: '50%', border: 'none',
+                background: M.s3, color: M.onSurface, cursor: 'pointer', fontSize: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>✕</button>
+            </div>
+
+            {/* 2-col style grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px' }}>
+              {CARD_STYLES.map(s => {
+                const selected = cardStyle === s.key;
+                return (
+                  <div key={s.key}
+                    onClick={() => { setCardStyle(s.key); setStylePickerOpen(false); }}
+                    style={{
+                      border: selected ? `2.5px solid ${M.primary}` : `1.5px solid ${M.outlineVar}`,
+                      borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
+                      background: selected ? 'rgba(99,102,241,0.04)' : '#fff',
+                      position: 'relative', transition: 'all .15s',
+                    }}>
+
+                    {/* Preview thumbnail */}
+                    <div style={{ height: 120, overflow: 'hidden', background: '#f5f7fa', position: 'relative' }}>
+                      <div style={{ transform: 'scale(0.48)', transformOrigin: 'top left', width: '208%', pointerEvents: 'none' }}>
+                        {s.key === 'classic'
+                          ? <StickerCard p={{ ...STYLE_PREV, classic: true }} font={font}
+                              onClick={() => {}} onDelete={() => {}} onSave={() => {}} active={false}
+                              isDragging={false} dragOverClass="" onDragStart={() => {}} onDragEnd={() => {}}
+                              onDragOver={() => {}} onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                          : <PriceTagCard p={STYLE_PREV} font={font} forcedLayout={s.layout}
+                              onClick={() => {}} onDelete={() => {}} onSave={() => {}} active={false}
+                              isDragging={false} dragOverClass="" onDragStart={() => {}} onDragEnd={() => {}}
+                              onDragOver={() => {}} onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                        }
+                      </div>
+                    </div>
+
+                    {/* Name & desc */}
+                    <div style={{ padding: '8px 10px 10px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: M.onSurface }}>{s.icon} {s.name}</div>
+                      <div style={{ fontSize: 10, color: M.onSurfaceVar, marginTop: 2 }}>{s.desc}</div>
+                    </div>
+
+                    {/* Selected checkmark */}
+                    {selected && (
+                      <div style={{
+                        position: 'absolute', bottom: 10, right: 10,
+                        width: 22, height: 22, borderRadius: '50%',
+                        background: M.primary, color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 900,
+                      }}>✓</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit / Add Modal ── */}
       {modal !== null && (
