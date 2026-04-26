@@ -18,6 +18,7 @@ export default function PriceTagCard({
   p, font, onClick, onDelete, onSave, active,
   isDragging, dragOverClass,
   onDragStart, onDragEnd, onDragOver, onDragEnter, onDragLeave, onDrop,
+  forcedLayout,
   ...rest
 }) {
   const [hov, setHov]       = useState(false);
@@ -29,7 +30,7 @@ export default function PriceTagCard({
   const brand  = parseBrand(p);
   const model  = parseModel(p);
 
-  const Layout = LAYOUTS[theme.layout] ?? L1;
+  const Layout = LAYOUTS[forcedLayout ?? theme.layout] ?? L1;
 
   /* Trigger fade+scale only when layout number changes */
   const layoutChanged = prevLayoutRef.current !== null && prevLayoutRef.current !== theme.layout;

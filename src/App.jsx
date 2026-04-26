@@ -37,6 +37,28 @@ function IcGrid({ s = 16 }) {
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
 }
 
+const CARD_STYLES = [
+  { key: 'classic', icon: '🏷️', name: 'Classic',       desc: 'Simple price tag',        layout: null },
+  { key: 'L1',      icon: '⚫', name: 'Dark Hero',      desc: 'Dark flagship style',     layout: 1    },
+  { key: 'L2',      icon: '🌟', name: 'Bright Card',    desc: 'Clean white shimmer',     layout: 2    },
+  { key: 'L3',      icon: '🔋', name: 'Battery Focus',  desc: 'Battery hero layout',     layout: 3    },
+  { key: 'L4',      icon: '📸', name: 'Camera Pro',     desc: 'Camera highlight',        layout: 4    },
+  { key: 'L5',      icon: '⚡', name: 'Flash Deal',     desc: 'Limited time offer',      layout: 5    },
+  { key: 'L6',      icon: '✨', name: 'Luxury Gold',    desc: 'Premium elegant',         layout: 6    },
+  { key: 'L7',      icon: '📊', name: 'Spec Grid',      desc: '6-spec comparison grid',  layout: 7    },
+  { key: 'L8',      icon: '🌙', name: 'Neon Glow',      desc: 'Gaming neon aesthetic',   layout: 8    },
+  { key: 'L9',      icon: '📋', name: 'Minimal Split',  desc: 'Clean split with bars',   layout: 9    },
+  { key: 'L10',     icon: '💥', name: 'Mega Splash',    desc: 'Bold offer banner',       layout: 10   },
+];
+const STYLE_PREV = {
+  id: 0, name: 'Samsung Galaxy S25 Ultra', brand: 'Samsung',
+  ram: '12', rom: '256', battery: '5000',
+  camera: '200', chip: 'Snapdragon 8 Gen 3', display: '6.8',
+  has5g: true, price: '49900', oldPrice: '55000',
+  featuredSpec: '', theme: 0, filled: false, ellipsis: false,
+  classic: false, romColor: '', batteryColor: '',
+};
+
 export default function App() {
   const [products,      setProducts]      = useState(INITIAL);
   const [font,          setFont]          = useState('Kanit');
@@ -63,6 +85,8 @@ export default function App() {
   const [templates,     setTemplates]     = useState([]);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [defaultStyle,  setDefaultStyle]  = useState({ theme: 0, filled: false, ellipsis: false });
+  const [cardStyle,       setCardStyle]       = useState('classic');
+  const [stylePickerOpen, setStylePickerOpen] = useState(false);
 
   const canvasRef           = useRef(null);
   const savedLoadedRef      = useRef(false);
@@ -137,13 +161,13 @@ export default function App() {
   /* ── Helpers ─────────────────────────────────────────────── */
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500); }
   function openAdd() {
-    setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis });
+    setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis, classic: cardStyle === 'classic' });
     setAddToShelf(false); setModal('add');
   }
   function openEmptySlot() {
     if (savedCards.length > 0) { setShelfPickOpen(true); }
     else {
-      setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis });
+      setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis, classic: cardStyle === 'classic' });
       setAddToShelf(false); setModal('add');
     }
   }
@@ -609,6 +633,30 @@ export default function App() {
             </select>
           </div>
 
+          {/* Card Style dropdown */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Card Style</div>
+            {(() => {
+              const cs = CARD_STYLES.find(x => x.key === cardStyle) || CARD_STYLES[0];
+              return (
+                <button onClick={() => setStylePickerOpen(true)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px', borderRadius: 10,
+                  border: `1px solid ${M.outlineVar}`, background: '#fff',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                  transition: 'all .15s', boxShadow: M.shadowSm,
+                }}>
+                  <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{cs.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: M.onSurface }}>{cs.name}</div>
+                    <div style={{ fontSize: 11, color: M.onSurfaceVar }}>{cs.desc}</div>
+                  </div>
+                  <IcChevDown s={16} />
+                </button>
+              );
+            })()}
+          </div>
+
           {/* Row 2: Columns | Paper */}
           <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, marginBottom: 14 }}>
 
@@ -741,21 +789,23 @@ export default function App() {
         {/* ── Sticker Grid ── */}
         <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowSm }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
-            {pageProds.map(p => (
-              p.classic
-                ? <StickerCard key={p.id} p={p} font={font}
-                    onClick={() => { if (!isDragging) openEdit(p); }}
-                    onDelete={() => remove(p.id)}
-                    onSave={() => saveCardToShelf(p)}
-                    active={modal === p.id}
-                    {...cdp(p)} />
-                : <PriceTagCard key={p.id} p={p} font={font}
-                    onClick={() => { if (!isDragging) openEdit(p); }}
-                    onDelete={() => remove(p.id)}
-                    onSave={() => saveCardToShelf(p)}
-                    active={modal === p.id}
-                    {...cdp(p)} />
-            ))}
+            {pageProds.map(p => {
+              const fl = CARD_STYLES.find(x => x.key === cardStyle)?.layout ?? null;
+              if (cardStyle === 'classic') {
+                return <StickerCard key={p.id} p={p} font={font}
+                  onClick={() => { if (!isDragging) openEdit(p); }}
+                  onDelete={() => remove(p.id)}
+                  onSave={() => saveCardToShelf(p)}
+                  active={modal === p.id}
+                  {...cdp(p)} />;
+              }
+              return <PriceTagCard key={p.id} p={p} font={font} forcedLayout={fl}
+                onClick={() => { if (!isDragging) openEdit(p); }}
+                onDelete={() => remove(p.id)}
+                onSave={() => saveCardToShelf(p)}
+                active={modal === p.id}
+                {...cdp(p)} />;
+            })}
             {Array.from({ length: emptySlots }).map((_, i) => (
               <div key={`e${i}`}
                 data-emptyslot="1"
@@ -821,11 +871,87 @@ export default function App() {
         font={font}
         onPickShelf={sc => { addSavedToGrid(sc); }}
         onNewCreate={() => {
-          setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis });
+          setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis, classic: cardStyle === 'classic' });
           setAddToShelf(false); setModal('add');
         }}
         onRemoveShelf={removeSavedCard}
       />
+
+      {/* ── Card Style Picker (bottom sheet) ── */}
+      {stylePickerOpen && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1500, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+          onClick={() => setStylePickerOpen(false)}>
+          <div
+            style={{ background: '#fff', borderRadius: '24px 24px 0 0', maxHeight: '88vh', overflowY: 'auto', paddingBottom: 32 }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '20px 20px 14px' }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: M.onSurface, letterSpacing: -0.3 }}>Card Style</div>
+                <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Choose how your price tags look</div>
+              </div>
+              <button onClick={() => setStylePickerOpen(false)} style={{
+                width: 36, height: 36, borderRadius: '50%', border: 'none',
+                background: M.s3, color: M.onSurface, cursor: 'pointer', fontSize: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>✕</button>
+            </div>
+
+            {/* 2-col style grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px' }}>
+              {CARD_STYLES.map(s => {
+                const selected = cardStyle === s.key;
+                return (
+                  <div key={s.key}
+                    onClick={() => { setCardStyle(s.key); setStylePickerOpen(false); }}
+                    style={{
+                      border: selected ? `2.5px solid ${M.primary}` : `1.5px solid ${M.outlineVar}`,
+                      borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
+                      background: selected ? 'rgba(99,102,241,0.04)' : '#fff',
+                      position: 'relative', transition: 'all .15s',
+                    }}>
+
+                    {/* Preview thumbnail */}
+                    <div style={{ height: 120, overflow: 'hidden', background: '#f5f7fa', position: 'relative' }}>
+                      <div style={{ transform: 'scale(0.48)', transformOrigin: 'top left', width: '208%', pointerEvents: 'none' }}>
+                        {s.key === 'classic'
+                          ? <StickerCard p={{ ...STYLE_PREV, classic: true }} font={font}
+                              onClick={() => {}} onDelete={() => {}} onSave={() => {}} active={false}
+                              isDragging={false} dragOverClass="" onDragStart={() => {}} onDragEnd={() => {}}
+                              onDragOver={() => {}} onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                          : <PriceTagCard p={STYLE_PREV} font={font} forcedLayout={s.layout}
+                              onClick={() => {}} onDelete={() => {}} onSave={() => {}} active={false}
+                              isDragging={false} dragOverClass="" onDragStart={() => {}} onDragEnd={() => {}}
+                              onDragOver={() => {}} onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                        }
+                      </div>
+                    </div>
+
+                    {/* Name & desc */}
+                    <div style={{ padding: '8px 10px 10px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: M.onSurface }}>{s.icon} {s.name}</div>
+                      <div style={{ fontSize: 10, color: M.onSurfaceVar, marginTop: 2 }}>{s.desc}</div>
+                    </div>
+
+                    {/* Selected checkmark */}
+                    {selected && (
+                      <div style={{
+                        position: 'absolute', bottom: 10, right: 10,
+                        width: 22, height: 22, borderRadius: '50%',
+                        background: M.primary, color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 900,
+                      }}>✓</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit / Add Modal ── */}
       {modal !== null && (
@@ -839,126 +965,187 @@ export default function App() {
               <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Fill in product details below</div>
             </div>
 
-            {/* Fields */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-              {[
-                { label: 'Product Name',       key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
-                { label: 'RAM (GB)',            key: 'ram',     ph: 'e.g. 8 or 8+8',  tag: v => `RAM: ${v} GB` },
-                { label: 'Storage / ROM (GB)', key: 'rom',     ph: 'e.g. 256',        tag: v => `ROM: ${v} GB` },
-                { label: 'Battery (mAh)',       key: 'battery', ph: 'e.g. 5000' },
-                { label: 'Price (THB)',         key: 'price',   ph: 'e.g. 9990' },
-              ].map(f => (
-                <div key={f.key}>
-                  <Field label={f.label} value={form[f.key]}
-                    onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))}
+            {/* ── CLASSIC SIMPLE FIELDS ── */}
+            {form.classic ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+
+                <Field label="Product Name" value={form.name}
+                  onChange={e => setForm(v => ({ ...v, name: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. Samsung Galaxy A55 5G" />
+
+                {/* Storage / ROM + inline colour picker */}
+                <div>
+                  <Field label="Storage / ROM (GB)" value={form.rom}
+                    onChange={e => setForm(v => ({ ...v, rom: e.target.value }))}
                     onKeyDown={e => e.key === 'Enter' && save()}
-                    placeholder={f.ph} />
-                  {f.tag && form[f.key] && (
+                    placeholder="e.g. 256" />
+                  {form.rom && (
                     <div style={{ marginTop: 5 }}>
                       <span style={{
-                        display: 'inline-block',
-                        padding: '3px 10px', borderRadius: 20,
+                        display: 'inline-block', padding: '3px 10px', borderRadius: 20,
                         fontSize: 11, fontWeight: 700,
-                        background: `${THEMES[form.theme].color}18`,
-                        color: THEMES[form.theme].color,
-                        border: `1px solid ${THEMES[form.theme].color}40`,
-                      }}>{f.tag(form[f.key])}</span>
+                        background: `${form.romColor || activeColor}18`,
+                        color: form.romColor || activeColor,
+                        border: `1px solid ${(form.romColor || activeColor)}40`,
+                      }}>Storage / ROM: {form.rom} GB</span>
                     </div>
                   )}
+                  <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: M.s2, border: `1px solid ${M.outlineVar}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>Storage / ROM Color</div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div onClick={() => setForm(f => ({ ...f, romColor: '' }))} title="Auto"
+                        style={{
+                          width: 28, height: 28, borderRadius: '50%', background: '#fff', cursor: 'pointer',
+                          border: !form.romColor ? `3px solid ${activeColor}` : `2px solid ${activeColor}35`,
+                          boxShadow: !form.romColor ? `0 0 0 2px ${activeColor}50` : '0 1px 4px rgba(0,0,0,0.12)',
+                          transform: !form.romColor ? 'scale(1.2)' : 'scale(1)', transition: 'all .15s',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 7, fontWeight: 900, color: activeColor,
+                        }}>AUTO</div>
+                      {THEMES.map((t, i) => (
+                        <div key={i} onClick={() => setForm(f => ({ ...f, romColor: t.color }))} title={t.label}
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%', background: t.color, cursor: 'pointer',
+                            border: form.romColor === t.color ? '3px solid #fff' : '2px solid transparent',
+                            boxShadow: form.romColor === t.color ? `0 0 0 2px ${t.color}, 0 3px 8px ${t.color}55` : '0 1px 4px rgba(0,0,0,0.15)',
+                            transform: form.romColor === t.color ? 'scale(1.2)' : 'scale(1)',
+                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
+                          }} />
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
 
-            {/* ── Phone Details (premium layout fields) ── */}
-            <div style={{ borderTop: `1px solid ${M.outlineVar}`, paddingTop: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar,
-                letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>
-                Phone Details
-              </div>
+                {/* Battery + inline colour picker */}
+                <div>
+                  <Field label="Battery (mAh)" value={form.battery}
+                    onChange={e => setForm(v => ({ ...v, battery: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                    placeholder="e.g. 5000" />
+                  <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: M.s2, border: `1px solid ${M.outlineVar}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>Battery Color</div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div onClick={() => setForm(f => ({ ...f, batteryColor: '' }))} title="Auto"
+                        style={{
+                          width: 28, height: 28, borderRadius: '50%', background: '#fff', cursor: 'pointer',
+                          border: !form.batteryColor ? `3px solid ${activeColor}` : `2px solid ${activeColor}35`,
+                          boxShadow: !form.batteryColor ? `0 0 0 2px ${activeColor}50` : '0 1px 4px rgba(0,0,0,0.12)',
+                          transform: !form.batteryColor ? 'scale(1.2)' : 'scale(1)', transition: 'all .15s',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 7, fontWeight: 900, color: activeColor,
+                        }}>AUTO</div>
+                      {THEMES.map((t, i) => (
+                        <div key={i} onClick={() => setForm(f => ({ ...f, batteryColor: t.color }))} title={t.label}
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%', background: t.color, cursor: 'pointer',
+                            border: form.batteryColor === t.color ? '3px solid #fff' : '2px solid transparent',
+                            boxShadow: form.batteryColor === t.color ? `0 0 0 2px ${t.color}, 0 3px 8px ${t.color}55` : '0 1px 4px rgba(0,0,0,0.15)',
+                            transform: form.batteryColor === t.color ? 'scale(1.2)' : 'scale(1)',
+                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
+                          }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-              {/* Brand */}
-              <div style={{ marginBottom: 10 }}>
-                <Field label="Brand" value={form.brand || ''}
-                  onChange={e => setForm(v => ({ ...v, brand: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. Samsung" />
-              </div>
-
-              {/* Camera + Chip */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <Field label="Camera (MP)" value={form.camera || ''}
-                  onChange={e => setForm(v => ({ ...v, camera: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. 50" />
-                <Field label="Chip" value={form.chip || ''}
-                  onChange={e => setForm(v => ({ ...v, chip: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder='e.g. SD 8 Gen 3' />
-              </div>
-
-              {/* Display + Old Price */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <Field label='Display (")' value={form.display || ''}
-                  onChange={e => setForm(v => ({ ...v, display: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. 6.7" />
-                <Field label="Original Price" value={form.oldPrice || ''}
-                  onChange={e => setForm(v => ({ ...v, oldPrice: e.target.value }))}
+                <Field label="Price (THB)" value={form.price}
+                  onChange={e => setForm(v => ({ ...v, price: e.target.value }))}
                   onKeyDown={e => e.key === 'Enter' && save()}
                   placeholder="e.g. 9990" />
+
               </div>
 
-              {/* Has 5G */}
-              <div style={{
-                marginBottom: 10, padding: '10px 14px', borderRadius: 12,
-                background: form.has5g ? 'rgba(26,115,232,0.06)' : M.s2,
-                border: `1px solid ${form.has5g ? 'rgba(26,115,232,0.2)' : 'rgba(0,0,0,0.06)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>
-                  5G Connectivity
+            ) : (
+              /* ── PREMIUM DYNAMIC FIELDS (original form) ── */
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                  {[
+                    { label: 'Product Name',       key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
+                    { label: 'RAM (GB)',            key: 'ram',     ph: 'e.g. 8 or 8+8',  tag: v => `RAM: ${v} GB` },
+                    { label: 'Storage / ROM (GB)', key: 'rom',     ph: 'e.g. 256',        tag: v => `ROM: ${v} GB` },
+                    { label: 'Battery (mAh)',       key: 'battery', ph: 'e.g. 5000' },
+                    { label: 'Price (THB)',         key: 'price',   ph: 'e.g. 9990' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <Field label={f.label} value={form[f.key]}
+                        onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))}
+                        onKeyDown={e => e.key === 'Enter' && save()}
+                        placeholder={f.ph} />
+                      {f.tag && form[f.key] && (
+                        <div style={{ marginTop: 5 }}>
+                          <span style={{
+                            display: 'inline-block', padding: '3px 10px', borderRadius: 20,
+                            fontSize: 11, fontWeight: 700,
+                            background: `${activeColor}18`, color: activeColor,
+                            border: `1px solid ${activeColor}40`,
+                          }}>{f.tag(form[f.key])}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <Switch value={!!form.has5g} onChange={v => setForm(f => ({ ...f, has5g: v }))} />
-              </div>
 
-              {/* Featured Spec */}
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar,
-                  letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
-                  Featured Spec (forces Camera Pro layout)
+                {/* Phone Details */}
+                <div style={{ borderTop: `1px solid ${M.outlineVar}`, paddingTop: 12, marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Phone Details</div>
+
+                  <div style={{ marginBottom: 10 }}>
+                    <Field label="Brand" value={form.brand || ''}
+                      onChange={e => setForm(v => ({ ...v, brand: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && save()}
+                      placeholder="e.g. Samsung" />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                    <Field label="Camera (MP)" value={form.camera || ''}
+                      onChange={e => setForm(v => ({ ...v, camera: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && save()}
+                      placeholder="e.g. 50" />
+                    <Field label="Chip" value={form.chip || ''}
+                      onChange={e => setForm(v => ({ ...v, chip: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && save()}
+                      placeholder='e.g. SD 8 Gen 3' />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                    <Field label='Display (")' value={form.display || ''}
+                      onChange={e => setForm(v => ({ ...v, display: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && save()}
+                      placeholder="e.g. 6.7" />
+                    <Field label="Original Price" value={form.oldPrice || ''}
+                      onChange={e => setForm(v => ({ ...v, oldPrice: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && save()}
+                      placeholder="e.g. 9990" />
+                  </div>
+
+                  <div style={{
+                    marginBottom: 10, padding: '10px 14px', borderRadius: 12,
+                    background: form.has5g ? 'rgba(26,115,232,0.06)' : M.s2,
+                    border: `1px solid ${form.has5g ? 'rgba(26,115,232,0.2)' : 'rgba(0,0,0,0.06)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>5G Connectivity</div>
+                    <Switch value={!!form.has5g} onChange={v => setForm(f => ({ ...f, has5g: v }))} />
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
+                      Featured Spec (forces Camera Pro layout)
+                    </div>
+                    <select className="ctrl-select"
+                      value={form.featuredSpec || ''}
+                      onChange={e => setForm(v => ({ ...v, featuredSpec: e.target.value }))}>
+                      <option value="">Auto-detect</option>
+                      <option value="camera">📸 Camera</option>
+                      <option value="battery">🔋 Battery</option>
+                    </select>
+                  </div>
                 </div>
-                <select className="ctrl-select"
-                  value={form.featuredSpec || ''}
-                  onChange={e => setForm(v => ({ ...v, featuredSpec: e.target.value }))}>
-                  <option value="">Auto-detect</option>
-                  <option value="camera">📸 Camera</option>
-                  <option value="battery">🔋 Battery</option>
-                </select>
-              </div>
-            </div>
+              </>
+            )}
 
-            {/* ── Card Layout toggle ── */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>Card Layout</div>
-              <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${M.outlineVar}` }}>
-                {[
-                  { key: false, label: '✨ Premium Dynamic' },
-                  { key: true,  label: '🏷️ Classic Simple'  },
-                ].map(({ key, label }) => (
-                  <button key={String(key)}
-                    onClick={() => setForm(f => ({ ...f, classic: key }))}
-                    style={{
-                      flex: 1, padding: '9px 6px', border: 'none',
-                      background: form.classic === key ? M.gradient : '#fff',
-                      color:      form.classic === key ? '#fff' : M.onSurfaceVar,
-                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                      fontFamily: 'inherit', transition: 'all .15s',
-                    }}>{label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Colour picker */}
+            {/* Sticker Color – always shown */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -974,76 +1161,33 @@ export default function App() {
               </div>
             </div>
 
-            {/* ── Field Colors (Classic Simple only) ── */}
-            {form.classic && (
-              <div style={{ marginBottom: 18, padding: '14px 14px', borderRadius: 14, background: `${activeColor}08`, border: `1px solid ${activeColor}25` }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 }}>Field Colors</div>
-                {[
-                  { label: 'Storage / ROM', key: 'romColor' },
-                  { label: 'Battery',       key: 'batteryColor' },
-                ].map(({ label, key }) => (
-                  <div key={key} style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: M.onSurface, marginBottom: 7 }}>{label}</div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {/* Auto swatch – uses the main sticker colour */}
-                      <div
-                        onClick={() => setForm(f => ({ ...f, [key]: '' }))}
-                        title="Auto (matches sticker color)"
-                        style={{
-                          width: 32, height: 32, borderRadius: '50%',
-                          background: '#fff',
-                          border: !form[key] ? `3px solid ${activeColor}` : `2px solid ${activeColor}40`,
-                          boxShadow: !form[key] ? `0 0 0 2px ${activeColor}55` : '0 2px 6px rgba(0,0,0,0.1)',
-                          transform: !form[key] ? 'scale(1.18)' : 'scale(1)',
-                          transition: 'all .15s',
-                          cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 8, fontWeight: 900, color: activeColor, letterSpacing: 0,
-                        }}>AUTO</div>
-                      {/* 7 theme colour swatches */}
-                      {THEMES.map((t, i) => (
-                        <div key={i}
-                          onClick={() => setForm(f => ({ ...f, [key]: t.color }))}
-                          title={t.label}
-                          style={{
-                            width: 32, height: 32, borderRadius: '50%', background: t.color, cursor: 'pointer',
-                            border: form[key] === t.color ? '3px solid #fff' : '3px solid transparent',
-                            boxShadow: form[key] === t.color ? `0 0 0 3px ${t.color}, 0 4px 12px ${t.color}60` : '0 2px 6px rgba(0,0,0,0.15)',
-                            transform: form[key] === t.color ? 'scale(1.18)' : 'scale(1)',
-                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
-                          }} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Style toggle */}
+            {/* Style toggle – always shown */}
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Style</div>
               <StyleToggle value={form.filled} onChange={v => setForm(f => ({ ...f, filled: v }))} color={activeColor} />
             </div>
 
-            {/* Set as default style */}
-            <div style={{
-              marginBottom: 14, padding: '10px 14px', borderRadius: 12,
-              background: isCurrentDefault ? `rgba(99,102,241,0.06)` : M.s2,
-              border: `1px solid ${isCurrentDefault ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-              transition: 'all .2s',
-            }}>
-              <div style={{ fontSize: 12, color: isCurrentDefault ? M.primary : M.onSurfaceVar, fontWeight: isCurrentDefault ? 600 : 400 }}>
-                {isCurrentDefault ? '✓ This is your default card style' : 'Save color & style as default for new cards'}
+            {/* Set as default – Premium Dynamic only */}
+            {!form.classic && (
+              <div style={{
+                marginBottom: 14, padding: '10px 14px', borderRadius: 12,
+                background: isCurrentDefault ? `rgba(99,102,241,0.06)` : M.s2,
+                border: `1px solid ${isCurrentDefault ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                transition: 'all .2s',
+              }}>
+                <div style={{ fontSize: 12, color: isCurrentDefault ? M.primary : M.onSurfaceVar, fontWeight: isCurrentDefault ? 600 : 400 }}>
+                  {isCurrentDefault ? '✓ This is your default card style' : 'Save color & style as default for new cards'}
+                </div>
+                {!isCurrentDefault && (
+                  <button onClick={applyDefaultStyle} style={{
+                    padding: '5px 13px', borderRadius: R.full, flexShrink: 0,
+                    background: M.s3, color: M.onSurfaceVar,
+                    border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  }}>Set Default</button>
+                )}
               </div>
-              {!isCurrentDefault && (
-                <button onClick={applyDefaultStyle} style={{
-                  padding: '5px 13px', borderRadius: R.full, flexShrink: 0,
-                  background: M.s3, color: M.onSurfaceVar,
-                  border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                }}>Set Default</button>
-              )}
-            </div>
+            )}
 
             {/* One-line name */}
             <div style={{
