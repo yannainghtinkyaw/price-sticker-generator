@@ -1,5 +1,5 @@
 import { M, R, THEMES } from '../lib/constants.js';
-import { STYLE_CATALOG, clampGridCols, clampGridRows, createSticker, getStyleMeta } from '../lib/stickerModel.js';
+import { STYLE_CATALOG, clampGridCols, clampGridRows, createSticker, getStyleEditorConfig, getStyleMeta } from '../lib/stickerModel.js';
 import Field from './Field.jsx';
 import Switch from './Switch.jsx';
 import StyleToggle from './StyleToggle.jsx';
@@ -21,6 +21,7 @@ export default function StickerEditorModal({
   setAddToShelf,
   font,
   canSave,
+  pageRows,
   onClose,
   onSave,
   previewCardProps,
@@ -29,6 +30,11 @@ export default function StickerEditorModal({
 
   const activeColor = THEMES[formData.theme]?.color || M.primary;
   const formStyleMeta = getStyleMeta(formStyleKey);
+  const editorConfig = getStyleEditorConfig(formStyleKey);
+  const visibleFields = new Set([...editorConfig.fields, ...(editorConfig.optionalFields || [])]);
+  const visibleBehavior = new Set(editorConfig.behavior || []);
+  const visibleAppearance = new Set(editorConfig.appearance || []);
+  const isFullPagePoster = formStyleMeta.layout === 11;
   const previewSticker = createSticker({
     id: 'preview',
     styleKey: formStyleKey,
@@ -36,6 +42,34 @@ export default function StickerEditorModal({
     gridRows: formGridRows,
     data: formData,
   });
+
+  const fieldMeta = {
+    name: { label: 'Product Name', placeholder: 'e.g. Samsung Galaxy A55 5G' },
+    brand: { label: 'Brand', placeholder: 'e.g. Samsung' },
+    price: { label: 'Price (THB)', placeholder: 'e.g. 9990' },
+    ram: { label: 'RAM', placeholder: '8' },
+    rom: { label: 'ROM', placeholder: '256' },
+    battery: { label: 'Battery', placeholder: '5000' },
+    camera: { label: 'Camera', placeholder: '50' },
+    display: { label: 'Display', placeholder: '6.7' },
+    chip: { label: 'Chip', placeholder: 'e.g. Snapdragon 8 Gen 3' },
+    oldPrice: { label: 'Old Price', placeholder: 'optional' },
+    featuredSpec: { label: 'Feature Note', placeholder: 'e.g. Dual Stereo, Tuned by JBL' },
+  };
+
+  const renderField = key => {
+    if (!visibleFields.has(key)) return null;
+    const meta = fieldMeta[key];
+    return (
+      <Field
+        key={key}
+        label={meta.label}
+        value={formData[key]}
+        onChange={event => setFormData(value => ({ ...value, [key]: event.target.value }))}
+        placeholder={meta.placeholder}
+      />
+    );
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,12,50,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 16, backdropFilter: 'blur(10px)' }}>
@@ -71,26 +105,63 @@ export default function StickerEditorModal({
           </div>
         </div>
 
+        {isFullPagePoster && (
+          <div style={{
+            marginBottom: 18,
+            padding: '12px 14px',
+            borderRadius: 12,
+            background: 'rgba(0,0,0,0.04)',
+            border: `1px solid ${M.outlineVar}`,
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: M.onSurface }}>
+              Full-page poster style
+            </div>
+            <div style={{ fontSize: 11, color: M.onSurfaceVar, marginTop: 4 }}>
+              This layout uses 6 x {formStyleMeta.defaultGridRows} grid cells and works best on an empty A4 page. If the current page has no room, it will move to another page.
+            </div>
+            {pageRows < formStyleMeta.defaultGridRows && (
+              <div style={{ fontSize: 11, color: M.error, marginTop: 6, fontWeight: 700 }}>
+                Current paper grid is shorter than this poster style.
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase' }}>Product details</div>
-          <Field label="Product Name" value={formData.name} onChange={event => setFormData(value => ({ ...value, name: event.target.value }))} placeholder="e.g. Samsung Galaxy A55 5G" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <Field label="Brand" value={formData.brand} onChange={event => setFormData(value => ({ ...value, brand: event.target.value }))} placeholder="e.g. Samsung" />
-            <Field label="Price (THB)" value={formData.price} onChange={event => setFormData(value => ({ ...value, price: event.target.value }))} placeholder="e.g. 9990" />
+          {renderField('name')}
+          {(visibleFields.has('price') || visibleFields.has('brand')) && (
+            <div style={{ display: 'grid', gridTemplateColumns: visibleFields.has('price') && visibleFields.has('brand') ? '1fr 1fr' : '1fr', gap: 8 }}>
+              {renderField('brand')}
+              {renderField('price')}
+            </div>
+          )}
+          {(visibleFields.has('ram') || visibleFields.has('rom') || visibleFields.has('battery')) && (
+            <div style={{ display: 'grid', gridTemplateColumns: [visibleFields.has('ram'), visibleFields.has('rom'), visibleFields.has('battery')].filter(Boolean).length >= 3 ? '1fr 1fr 1fr' : '1fr 1fr', gap: 8 }}>
+              {renderField('ram')}
+              {renderField('rom')}
+              {renderField('battery')}
+            </div>
+          )}
+          {(visibleFields.has('camera') || visibleFields.has('display')) && (
+            <div style={{ display: 'grid', gridTemplateColumns: visibleFields.has('camera') && visibleFields.has('display') ? '1fr 1fr' : '1fr', gap: 8 }}>
+              {renderField('camera')}
+              {renderField('display')}
+            </div>
+          )}
+          {renderField('chip')}
+          {renderField('featuredSpec')}
+          {renderField('oldPrice')}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
+            {[...editorConfig.required].map(key => (
+              <div key={key} style={{ padding: '4px 8px', borderRadius: 999, background: M.s2, border: `1px solid ${M.outlineVar}`, fontSize: 10, fontWeight: 700, color: M.onSurfaceVar }}>
+                Required: {fieldMeta[key]?.label || key}
+              </div>
+            ))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <Field label="RAM" value={formData.ram} onChange={event => setFormData(value => ({ ...value, ram: event.target.value }))} placeholder="8" />
-            <Field label="ROM" value={formData.rom} onChange={event => setFormData(value => ({ ...value, rom: event.target.value }))} placeholder="256" />
-            <Field label="Battery" value={formData.battery} onChange={event => setFormData(value => ({ ...value, battery: event.target.value }))} placeholder="5000" />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <Field label="Camera" value={formData.camera} onChange={event => setFormData(value => ({ ...value, camera: event.target.value }))} placeholder="50" />
-            <Field label="Display" value={formData.display} onChange={event => setFormData(value => ({ ...value, display: event.target.value }))} placeholder="6.7" />
-          </div>
-          <Field label="Chip" value={formData.chip} onChange={event => setFormData(value => ({ ...value, chip: event.target.value }))} placeholder="e.g. Snapdragon 8 Gen 3" />
-          <Field label="Old Price" value={formData.oldPrice} onChange={event => setFormData(value => ({ ...value, oldPrice: event.target.value }))} placeholder="optional" />
         </div>
 
+        {visibleAppearance.has('theme') && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Visual style</div>
           <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
@@ -114,14 +185,18 @@ export default function StickerEditorModal({
             ))}
           </div>
         </div>
+        )}
 
+        {visibleAppearance.has('filled') && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Style Fill</div>
           <StyleToggle value={formData.filled} onChange={value => setFormData(current => ({ ...current, filled: value }))} color={activeColor} />
         </div>
+        )}
 
         <div style={{ display: 'grid', gap: 12, marginBottom: 18 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase' }}>Behavior</div>
+          {visibleBehavior.has('ellipsis') && (
           <div style={{ padding: '12px 14px', borderRadius: 12, background: M.s2, border: `1px solid ${M.outlineVar}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>One-line name</div>
@@ -129,7 +204,9 @@ export default function StickerEditorModal({
             </div>
             <Switch value={formData.ellipsis} onChange={value => setFormData(current => ({ ...current, ellipsis: value }))} />
           </div>
+          )}
 
+          {visibleBehavior.has('has5g') && (
           <div style={{ padding: '12px 14px', borderRadius: 12, background: M.s2, border: `1px solid ${M.outlineVar}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>5G Connectivity</div>
@@ -137,6 +214,7 @@ export default function StickerEditorModal({
             </div>
             <Switch value={!!formData.has5g} onChange={value => setFormData(current => ({ ...current, has5g: value }))} />
           </div>
+          )}
 
           <div style={{ padding: '12px 14px', borderRadius: 12, background: addToShelf ? 'rgba(0,0,0,0.05)' : M.s2, border: `1px solid ${M.outlineVar}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
@@ -151,7 +229,7 @@ export default function StickerEditorModal({
           <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, textTransform: 'uppercase', marginBottom: 8 }}>
             Preview
           </div>
-          <div style={{ maxWidth: formGridCols >= 3 ? 360 : formGridCols === 2 ? 240 : 160, padding: 10, borderRadius: 14, background: M.s2, border: `1px solid ${M.outlineVar}` }}>
+          <div style={{ maxWidth: isFullPagePoster ? 420 : (formGridCols >= 3 ? 360 : formGridCols === 2 ? 240 : 160), padding: 10, borderRadius: 14, background: M.s2, border: `1px solid ${M.outlineVar}` }}>
             {formStyleKey === 'classic'
               ? <StickerCard p={previewSticker.data} font={font} {...previewCardProps} />
               : <PriceTagCard p={previewSticker.data} font={font} forcedLayout={getStyleMeta(formStyleKey).layout} {...previewCardProps} />}

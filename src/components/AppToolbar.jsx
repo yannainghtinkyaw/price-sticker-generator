@@ -21,6 +21,9 @@ export default function AppToolbar({
   onGenerateImage,
   onGeneratePDF,
   pagesCount,
+  selectedStyleName,
+  clearConfirm,
+  onClearAll,
   icons,
 }) {
   const { cardStack, layers, upload, chevDown, image, file } = icons;
@@ -31,7 +34,7 @@ export default function AppToolbar({
         style={{
           position: 'sticky',
           top: 0,
-          zIndex: 100,
+          zIndex: 500,
           background: 'rgba(255,255,255,0.9)',
           backdropFilter: 'blur(22px)',
           borderBottom: `1px solid ${M.outlineVar}`,
@@ -73,6 +76,20 @@ export default function AppToolbar({
           <select className="ctrl-select appbar-chip-select" value={paperSize} onChange={event => setPaperSize(event.target.value)} style={{ minWidth: 180 }}>
             {paperSizes.map(size => <option key={size.id} value={size.id}>{size.label} - {size.desc}</option>)}
           </select>
+        </div>
+
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: R.full,
+            background: M.primaryContainer,
+            color: M.primary,
+            fontSize: 12,
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span className="bar-label">New style: </span>{selectedStyleName}
         </div>
 
         <button onClick={onOpenStyles} title="Sticker styles"
@@ -128,6 +145,24 @@ export default function AppToolbar({
           }}>
           {upload}
           <span className="bar-label">Import</span>
+        </button>
+
+        <button onClick={onClearAll}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 14px',
+            borderRadius: R.full,
+            background: '#fff',
+            color: clearConfirm ? M.error : M.onSurface,
+            border: `1px solid ${clearConfirm ? M.error : M.outlineVar}`,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}>
+          <span>{clearConfirm ? 'Confirm Clear' : 'Clear All'}</span>
         </button>
 
         <div style={{ position: 'relative' }}>
@@ -196,7 +231,7 @@ export default function AppToolbar({
         </div>
       </div>
 
-      {dlOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 200 }} onClick={() => setDlOpen(false)} />}
+      {dlOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 400 }} onClick={() => setDlOpen(false)} />}
     </>
   );
 }
