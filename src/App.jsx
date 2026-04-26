@@ -8,6 +8,7 @@ import Snack        from './components/Snack.jsx';
 import StyleToggle  from './components/StyleToggle.jsx';
 import ShelfCard    from './components/ShelfCard.jsx';
 import PriceTagCard from './components/PriceTagCard.jsx';
+import StickerCard  from './components/StickerCard.jsx';
 import ShelfPickDialog   from './dialogs/ShelfPickDialog.jsx';
 import CsvDialog         from './dialogs/CsvDialog.jsx';
 import TemplatesDialog   from './dialogs/TemplatesDialog.jsx';
@@ -153,6 +154,7 @@ export default function App() {
       display: p.display || '', has5g: !!p.has5g,
       price: p.price, oldPrice: p.oldPrice || '', featuredSpec: p.featuredSpec || '',
       theme: p.theme, filled: !!p.filled, ellipsis: !!p.ellipsis,
+      classic: !!p.classic, romColor: p.romColor || '', batteryColor: p.batteryColor || '',
     });
     setAddToShelf(false); setModal(p.id);
   }
@@ -186,7 +188,9 @@ export default function App() {
       battery: p.battery, camera: p.camera, chip: p.chip,
       display: p.display, has5g: p.has5g,
       price: p.price, oldPrice: p.oldPrice, featuredSpec: p.featuredSpec,
-      theme: p.theme, filled: p.filled, savedId: Date.now(),
+      theme: p.theme, filled: p.filled,
+      classic: !!p.classic, romColor: p.romColor || '', batteryColor: p.batteryColor || '',
+      savedId: Date.now(),
     }]);
     showToast('⭐ Saved to shelf!');
   }
@@ -738,12 +742,19 @@ export default function App() {
         <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowSm }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
             {pageProds.map(p => (
-              <PriceTagCard key={p.id} p={p} font={font}
-                onClick={() => { if (!isDragging) openEdit(p); }}
-                onDelete={() => remove(p.id)}
-                onSave={() => saveCardToShelf(p)}
-                active={modal === p.id}
-                {...cdp(p)} />
+              p.classic
+                ? <StickerCard key={p.id} p={p} font={font}
+                    onClick={() => { if (!isDragging) openEdit(p); }}
+                    onDelete={() => remove(p.id)}
+                    onSave={() => saveCardToShelf(p)}
+                    active={modal === p.id}
+                    {...cdp(p)} />
+                : <PriceTagCard key={p.id} p={p} font={font}
+                    onClick={() => { if (!isDragging) openEdit(p); }}
+                    onDelete={() => remove(p.id)}
+                    onSave={() => saveCardToShelf(p)}
+                    active={modal === p.id}
+                    {...cdp(p)} />
             ))}
             {Array.from({ length: emptySlots }).map((_, i) => (
               <div key={`e${i}`}
@@ -926,6 +937,27 @@ export default function App() {
               </div>
             </div>
 
+            {/* ── Card Layout toggle ── */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>Card Layout</div>
+              <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${M.outlineVar}` }}>
+                {[
+                  { key: false, label: '✨ Premium Dynamic' },
+                  { key: true,  label: '🏷️ Classic Simple'  },
+                ].map(({ key, label }) => (
+                  <button key={String(key)}
+                    onClick={() => setForm(f => ({ ...f, classic: key }))}
+                    style={{
+                      flex: 1, padding: '9px 6px', border: 'none',
+                      background: form.classic === key ? M.gradient : '#fff',
+                      color:      form.classic === key ? '#fff' : M.onSurfaceVar,
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      fontFamily: 'inherit', transition: 'all .15s',
+                    }}>{label}</button>
+                ))}
+              </div>
+            </div>
+
             {/* Colour picker */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
@@ -941,6 +973,51 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            {/* ── Field Colors (Classic Simple only) ── */}
+            {form.classic && (
+              <div style={{ marginBottom: 18, padding: '14px 14px', borderRadius: 14, background: `${activeColor}08`, border: `1px solid ${activeColor}25` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 }}>Field Colors</div>
+                {[
+                  { label: 'Storage / ROM', key: 'romColor' },
+                  { label: 'Battery',       key: 'batteryColor' },
+                ].map(({ label, key }) => (
+                  <div key={key} style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: M.onSurface, marginBottom: 7 }}>{label}</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {/* Auto swatch – uses the main sticker colour */}
+                      <div
+                        onClick={() => setForm(f => ({ ...f, [key]: '' }))}
+                        title="Auto (matches sticker color)"
+                        style={{
+                          width: 32, height: 32, borderRadius: '50%',
+                          background: '#fff',
+                          border: !form[key] ? `3px solid ${activeColor}` : `2px solid ${activeColor}40`,
+                          boxShadow: !form[key] ? `0 0 0 2px ${activeColor}55` : '0 2px 6px rgba(0,0,0,0.1)',
+                          transform: !form[key] ? 'scale(1.18)' : 'scale(1)',
+                          transition: 'all .15s',
+                          cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 8, fontWeight: 900, color: activeColor, letterSpacing: 0,
+                        }}>AUTO</div>
+                      {/* 7 theme colour swatches */}
+                      {THEMES.map((t, i) => (
+                        <div key={i}
+                          onClick={() => setForm(f => ({ ...f, [key]: t.color }))}
+                          title={t.label}
+                          style={{
+                            width: 32, height: 32, borderRadius: '50%', background: t.color, cursor: 'pointer',
+                            border: form[key] === t.color ? '3px solid #fff' : '3px solid transparent',
+                            boxShadow: form[key] === t.color ? `0 0 0 3px ${t.color}, 0 4px 12px ${t.color}60` : '0 2px 6px rgba(0,0,0,0.15)',
+                            transform: form[key] === t.color ? 'scale(1.18)' : 'scale(1)',
+                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
+                          }} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Style toggle */}
             <div style={{ marginBottom: 14 }}>
@@ -1014,11 +1091,18 @@ export default function App() {
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Preview</div>
                 <div style={{ maxWidth: 148 }}>
-                  <PriceTagCard p={{ ...form, id: 0 }} font={font}
-                    onClick={() => {}} onDelete={() => {}} onSave={() => {}}
-                    active={false} isDragging={false} dragOverClass=""
-                    onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
-                    onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                  {form.classic
+                    ? <StickerCard p={{ ...form, id: 0 }} font={font}
+                        onClick={() => {}} onDelete={() => {}} onSave={() => {}}
+                        active={false} isDragging={false} dragOverClass=""
+                        onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
+                        onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                    : <PriceTagCard p={{ ...form, id: 0 }} font={font}
+                        onClick={() => {}} onDelete={() => {}} onSave={() => {}}
+                        active={false} isDragging={false} dragOverClass=""
+                        onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
+                        onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
+                  }
                 </div>
               </div>
             )}

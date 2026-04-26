@@ -90,6 +90,7 @@ export const EMPTY = {
   camera: '', chip: '', display: '', has5g: false,
   price: '', oldPrice: '', featuredSpec: '',
   theme: 0, filled: false, ellipsis: false,
+  classic: false, romColor: '', batteryColor: '',
 };
 
 export const PER_PAGE = 15;

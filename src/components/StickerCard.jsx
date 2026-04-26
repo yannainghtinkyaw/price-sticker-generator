@@ -13,6 +13,10 @@ export default function StickerCard({
   const bg     = filled ? c : '#fff';
   const fg     = filled ? '#fff' : c;
 
+  /* Per-field colors – fall back to the card's theme colour */
+  const romFg  = p.romColor     || fg;
+  const battFg = p.batteryColor || fg;
+
   const shadow = hov
     ? `0 10px 32px ${c}55, 0 4px 12px rgba(0,0,0,0.1)`
     : filled
@@ -35,7 +39,7 @@ export default function StickerCard({
       style={{
         border:       active ? `2px solid ${c}` : (filled ? 'none' : `1.5px solid ${c}`),
         borderRadius: 14,
-        padding:      '13px 10px 11px',
+        padding:      '16px 12px 14px',
         background:   filled
           ? `linear-gradient(145deg, ${c} 0%, ${c}CC 100%)`
           : bg,
@@ -125,30 +129,40 @@ export default function StickerCard({
           transition: 'all .15s',
         }}>✕</button>
 
-      {/* Product name */}
+      {/* Product name – bigger & bolder */}
       <div style={{
-        fontWeight: 900, fontSize: 12, color: fg,
-        textAlign: 'center', lineHeight: 1.3, marginBottom: 4,
-        marginTop: filled ? 8 : 5,
+        fontWeight: 900, fontSize: 15, color: fg,
+        textAlign: 'center', lineHeight: 1.3, marginBottom: 7,
+        marginTop: filled ? 10 : 7,
         ...(p.ellipsis
           ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }
           : {}),
       }}>{p.name}</div>
 
-      {/* Specs */}
-      <div style={{ fontSize: 9.5, color: fg, textAlign: 'center', opacity: .75, lineHeight: 1.5 }}>
-        RAM {p.ram} / ROM {p.rom} GB
+      {/* Storage / ROM – custom field colour */}
+      <div style={{
+        fontSize: 12, fontWeight: 800, color: romFg,
+        textAlign: 'center', lineHeight: 1.6,
+        letterSpacing: 0.1,
+      }}>
+        Storage / ROM {p.rom} GB
       </div>
-      <div style={{ fontSize: 9.5, color: fg, textAlign: 'center', opacity: .75 }}>
+
+      {/* Battery – custom field colour */}
+      <div style={{
+        fontSize: 12, fontWeight: 800, color: battFg,
+        textAlign: 'center', lineHeight: 1.6,
+        letterSpacing: 0.1,
+      }}>
         {p.battery} mAh
       </div>
 
-      {/* Price badge */}
+      {/* Price badge – bigger */}
       <div style={{
         border: `1.5px solid ${filled ? 'rgba(255,255,255,0.55)' : c}`,
         background: filled ? 'rgba(255,255,255,0.14)' : 'transparent',
-        borderRadius: 10, marginTop: 8, padding: '4px 0',
-        fontWeight: 900, fontSize: 17, color: fg,
+        borderRadius: 10, marginTop: 9, padding: '5px 0',
+        fontWeight: 900, fontSize: 20, color: fg,
         textAlign: 'center', letterSpacing: -0.3,
       }}>{p.price}.-</div>
     </div>
