@@ -1,87 +1,165 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { M, R, THEMES } from '../lib/constants.js';
+import { getStyleMeta } from '../lib/stickerModel.js';
 
-export default function ShelfPickDialog({ open, onClose, savedCards, font, onPickShelf, onNewCreate, onRemoveShelf }) {
-  const [search,        setSearch]        = useState('');
+export default function ShelfPickDialog({
+  open,
+  onClose,
+  savedCards,
+  font,
+  onPickShelf,
+  onNewCreate,
+  onRemoveShelf,
+  onExportJson,
+  onImportJson,
+}) {
+  const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const fileRef = useRef(null);
 
-  useEffect(() => { if (!open) setSearch(''); }, [open]);
-
-  const filtered = savedCards.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.price.includes(search)
-  );
+  useEffect(() => {
+    if (!open) setSearch('');
+  }, [open]);
 
   if (!open) return null;
 
+  const filtered = savedCards.filter(item => {
+    const name = item.sticker?.data?.name || '';
+    const price = item.sticker?.data?.price || '';
+    return name.toLowerCase().includes(search.toLowerCase()) || String(price).includes(search);
+  });
+
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed',
+      inset: 0,
+      zIndex: 1000,
       background: 'rgba(0,0,0,0.52)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      display: 'flex',
+      alignItems: 'flex-end',
+      justifyContent: 'center',
       backdropFilter: 'blur(4px)',
       fontFamily: `'${font}',sans-serif`,
-    }}>
+    }}
+      onClick={onClose}>
       <div style={{
         background: M.s1,
         borderRadius: `${R.xl}px ${R.xl}px 0 0`,
-        width: '100%', maxWidth: 480,
+        width: '100%',
+        maxWidth: 560,
         boxShadow: '0 -8px 40px rgba(0,0,0,0.25)',
-        maxHeight: '82vh',
-        display: 'flex', flexDirection: 'column',
+        maxHeight: '88vh',
+        display: 'flex',
+        flexDirection: 'column',
         animation: 'slideUp .25s cubic-bezier(.2,0,0,1)',
-      }}>
-
-        {/* Handle bar */}
+      }}
+        onClick={event => event.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 0' }}>
           <div style={{ width: 36, height: 4, borderRadius: R.full, background: M.outlineVar }} />
         </div>
 
-        {/* Header */}
-        <div style={{ padding: '14px 20px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '14px 20px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 500, color: M.onSurface }}>Add from Shelf</div>
+            <div style={{ fontSize: 18, fontWeight: 500, color: M.onSurface }}>Shelf Library</div>
             <div style={{ fontSize: 12, color: M.onSurfaceVar, marginTop: 2 }}>
-              {savedCards.length} saved · tap to add to grid
+              Every shelf item keeps its own style, data, and grid span.
             </div>
           </div>
           <button onClick={onClose} style={{
-            width: 34, height: 34, borderRadius: '50%', border: 'none',
-            background: M.s3, color: M.onSurfaceVar, fontSize: 16, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>✕</button>
+            width: 34,
+            height: 34,
+            borderRadius: '50%',
+            border: 'none',
+            background: M.s3,
+            color: M.onSurfaceVar,
+            fontSize: 16,
+            cursor: 'pointer',
+          }}>x</button>
         </div>
 
-        {/* Search */}
+        <div style={{ padding: '0 20px 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={onExportJson}
+            disabled={savedCards.length === 0}
+            style={{
+              padding: '8px 14px',
+              borderRadius: R.full,
+              border: `1px solid ${M.outlineVar}`,
+              background: savedCards.length === 0 ? M.s3 : '#fff',
+              color: savedCards.length === 0 ? M.onSurfaceVar : M.onSurface,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: savedCards.length === 0 ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Export Shelf JSON
+          </button>
+          <button
+            onClick={() => fileRef.current?.click()}
+            style={{
+              padding: '8px 14px',
+              borderRadius: R.full,
+              border: `1px solid ${M.outlineVar}`,
+              background: '#fff',
+              color: M.onSurface,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Import JSON
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: 'none' }}
+            onChange={event => {
+              const file = event.target.files?.[0];
+              if (file) onImportJson(file);
+              event.target.value = '';
+            }}
+          />
+        </div>
+
         <div style={{ padding: '0 20px 12px' }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
             border: `${searchFocused ? 2 : 1}px solid ${searchFocused ? M.primary : M.outlineVar}`,
             borderRadius: R.full,
-            background: M.s0, padding: '9px 16px',
-            transition: 'border .15s',
+            background: M.s0,
+            padding: '9px 16px',
           }}>
-            <span style={{ fontSize: 16, opacity: .5 }}>🔍</span>
+            <span style={{ fontSize: 16, opacity: 0.5 }}>S</span>
             <input
               value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search name or price…"
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Search name or price..."
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
               style={{
-                border: 'none', background: 'transparent', outline: 'none',
-                flex: 1, fontSize: 14, color: M.onSurface, fontFamily: 'inherit',
+                border: 'none',
+                background: 'transparent',
+                outline: 'none',
+                flex: 1,
+                fontSize: 14,
+                color: M.onSurface,
+                fontFamily: 'inherit',
               }}
-              autoFocus
             />
             {search && (
               <button onClick={() => setSearch('')}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: M.onSurfaceVar, padding: 0 }}>✕</button>
+                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: M.onSurfaceVar, padding: 0 }}>
+                x
+              </button>
             )}
           </div>
         </div>
 
-        {/* Card list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px', paddingBottom: 88 }}>
           {filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: M.onSurfaceVar, fontSize: 14 }}>
@@ -89,58 +167,82 @@ export default function ShelfPickDialog({ open, onClose, savedCards, font, onPic
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {filtered.map(s => {
-                const c      = THEMES[s.theme].color;
-                const filled = !!s.filled;
+              {filtered.map(item => {
+                const data = item.sticker.data;
+                const theme = THEMES[data.theme].color;
+                const filled = !!data.filled;
+                const style = getStyleMeta(item.sticker.styleKey);
                 return (
-                  <div key={s.savedId}
-                    onClick={() => { onPickShelf(s); onClose(); }}
+                  <div key={item.id}
+                    onClick={() => onPickShelf(item)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 14,
-                      padding: '11px 14px', borderRadius: R.md,
-                      border: `1px solid ${c}33`,
-                      background: filled ? c : M.s0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      padding: '11px 14px',
+                      borderRadius: R.md,
+                      border: `1px solid ${theme}33`,
+                      background: filled ? theme : M.s0,
                       cursor: 'pointer',
-                      transition: 'all .14s cubic-bezier(.2,0,0,1)',
-                      position: 'relative', overflow: 'hidden',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(3px)'; e.currentTarget.style.boxShadow = `0 3px 14px ${c}44`; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
-
-                    {/* Left colour accent */}
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}>
                     <div style={{
-                      width: 4, height: '100%', position: 'absolute', left: 0, top: 0,
-                      background: c, borderRadius: `${R.md}px 0 0 ${R.md}px`,
+                      width: 4,
+                      height: '100%',
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      background: theme,
                     }} />
 
                     <div style={{ marginLeft: 4, flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontWeight: 700, fontSize: 13,
+                        fontWeight: 700,
+                        fontSize: 13,
                         color: filled ? '#fff' : M.onSurface,
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>{s.name}</div>
-                      <div style={{ fontSize: 11, color: filled ? 'rgba(255,255,255,0.7)' : M.onSurfaceVar, marginTop: 1 }}>
-                        Ram {s.ram} / Rom {s.rom} GB · {s.battery} mAh
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}>
+                        {data.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: filled ? 'rgba(255,255,255,0.72)' : M.onSurfaceVar, marginTop: 1 }}>
+                        {style.name} | {item.sticker.gridCols} col | RAM {data.ram} | ROM {data.rom}
                       </div>
                     </div>
 
                     <div style={{
-                      padding: '5px 14px', borderRadius: R.full,
-                      border: `1.5px solid ${filled ? 'rgba(255,255,255,0.7)' : c}`,
+                      padding: '5px 12px',
+                      borderRadius: R.full,
+                      border: `1.5px solid ${filled ? 'rgba(255,255,255,0.7)' : theme}`,
                       background: filled ? 'rgba(255,255,255,0.14)' : 'transparent',
-                      color: filled ? '#fff' : c,
-                      fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap',
-                    }}>{s.price}.-</div>
+                      color: filled ? '#fff' : theme,
+                      fontWeight: 800,
+                      fontSize: 13,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {data.price}.-
+                    </div>
 
                     <button
-                      onClick={e => { e.stopPropagation(); onRemoveShelf(s.savedId); }}
+                      onClick={event => {
+                        event.stopPropagation();
+                        onRemoveShelf(item.id);
+                      }}
                       style={{
-                        width: 24, height: 24, borderRadius: '50%', border: 'none',
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        border: 'none',
                         background: filled ? 'rgba(255,255,255,0.2)' : M.s3,
                         color: filled ? '#fff' : M.onSurfaceVar,
-                        fontSize: 11, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      }}>✕</button>
+                        fontSize: 11,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      x
+                    </button>
                   </div>
                 );
               })}
@@ -148,28 +250,34 @@ export default function ShelfPickDialog({ open, onClose, savedCards, font, onPic
           )}
         </div>
 
-        {/* Fixed bottom CTA */}
         <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
           padding: '14px 20px 20px',
           background: `linear-gradient(to top, ${M.s1} 70%, transparent)`,
           pointerEvents: 'none',
         }}>
           <button
-            onClick={() => { onClose(); onNewCreate(); }}
-            style={{
-              width: '100%', padding: '14px 0', borderRadius: R.xl, border: 'none',
-              background: M.primary, color: M.onPrimary,
-              fontSize: 15, fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(0,84,163,0.35)',
-              fontFamily: `'${font}',sans-serif`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              pointerEvents: 'all',
-              transition: 'all .15s cubic-bezier(.2,0,0,1)',
+            onClick={() => {
+              onClose();
+              onNewCreate();
             }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(0,84,163,0.45)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,84,163,0.35)'; e.currentTarget.style.transform = 'none'; }}>
-            <span style={{ fontSize: 20, lineHeight: 1 }}>＋</span>
+            style={{
+              width: '100%',
+              padding: '14px 0',
+              borderRadius: R.xl,
+              border: 'none',
+              background: M.primary,
+              color: M.onPrimary,
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: `'${font}',sans-serif`,
+              pointerEvents: 'all',
+            }}
+          >
             Create New Sticker
           </button>
         </div>

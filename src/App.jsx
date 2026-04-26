@@ -1,867 +1,1075 @@
-import { useState, useRef, useEffect } from 'react';
-import { M, R, THEMES, FONTS, GRID_OPTIONS, PAPER_SIZES, INITIAL, EMPTY, PER_PAGE } from './lib/constants.js';
-import { rrect, drawSticker } from './lib/canvas.js';
-import Btn          from './components/Btn.jsx';
-import Switch       from './components/Switch.jsx';
-import Field        from './components/Field.jsx';
-import Snack        from './components/Snack.jsx';
-import StyleToggle  from './components/StyleToggle.jsx';
-import ShelfCard    from './components/ShelfCard.jsx';
+import { useEffect, useRef, useState } from 'react';
+import { M, R, THEMES, FONTS, PAPER_SIZES } from './lib/constants.js';
+import { drawSticker } from './lib/canvas.js';
+import {
+  BASE_GRID_COLS,
+  SAMPLE_STICKER_DATA,
+  STYLE_CATALOG,
+  clampGridCols,
+  clampGridRows,
+  cloneSticker,
+  createInitialStickers,
+  createShelfItem,
+  createSticker,
+  createWorkspaceSnapshot,
+  getPageRowsForPaper,
+  getStyleMeta,
+  hydrateShelfItems,
+  hydrateWorkspaceSnapshot,
+  normalizeStickerData,
+  packStickerPages,
+} from './lib/stickerModel.js';
+import Btn from './components/Btn.jsx';
+import Snack from './components/Snack.jsx';
+import ShelfCard from './components/ShelfCard.jsx';
 import PriceTagCard from './components/PriceTagCard.jsx';
-import StickerCard  from './components/StickerCard.jsx';
-import ShelfPickDialog   from './dialogs/ShelfPickDialog.jsx';
-import CsvDialog         from './dialogs/CsvDialog.jsx';
-import TemplatesDialog   from './dialogs/TemplatesDialog.jsx';
+import StickerCard from './components/StickerCard.jsx';
+import AppToolbar from './components/AppToolbar.jsx';
+import StickerEditorModal from './components/StickerEditorModal.jsx';
+import ShelfPickDialog from './dialogs/ShelfPickDialog.jsx';
+import CsvDialog from './dialogs/CsvDialog.jsx';
+import TemplatesDialog from './dialogs/TemplatesDialog.jsx';
 
-/* ── localStorage helpers ───────────────────────────────────── */
-function lsGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
-function lsSet(key, val) { try { localStorage.setItem(key, val); } catch {} }
+const LS_WORKSPACE = 'pts_workspace_v4';
+const LS_SHELF = 'pts_shelf_v2';
+const LS_TEMPLATES = 'pts_templates_v2';
 
-/* ── SVG icons (Feather-style, no extra dep) ────────────────── */
+function lsGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function lsSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
+
+function uid(prefix) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function readJsonFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('No file selected'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = event => {
+      try {
+        resolve(JSON.parse(String(event.target?.result || '{}')));
+      } catch {
+        reject(new Error('Invalid JSON file'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsText(file);
+  });
+}
+
+function triggerDownload(filename, href) {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = href;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function IcUpload({ s = 16 }) {
-  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>;
 }
 function IcImage({ s = 16 }) {
-  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>;
 }
 function IcChevDown({ s = 14 }) {
-  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>;
 }
 function IcLayers({ s = 16 }) {
-  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>;
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>;
 }
 function IcFile({ s = 16 }) {
-  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>;
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>;
 }
 function IcGrid({ s = 16 }) {
-  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>;
+}
+function IcCardStack({ s = 16 }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 7.5h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z" /><path d="M8 5.5h8" /><path d="M9 3.5h6" /></svg>;
 }
 
-const CARD_STYLES = [
-  { key: 'classic', icon: '🏷️', name: 'Classic',       desc: 'Simple price tag',        layout: null },
-  { key: 'L1',      icon: '⚫', name: 'Dark Hero',      desc: 'Dark flagship style',     layout: 1    },
-  { key: 'L2',      icon: '🌟', name: 'Bright Card',    desc: 'Clean white shimmer',     layout: 2    },
-  { key: 'L3',      icon: '🔋', name: 'Battery Focus',  desc: 'Battery hero layout',     layout: 3    },
-  { key: 'L4',      icon: '📸', name: 'Camera Pro',     desc: 'Camera highlight',        layout: 4    },
-  { key: 'L5',      icon: '⚡', name: 'Flash Deal',     desc: 'Limited time offer',      layout: 5    },
-  { key: 'L6',      icon: '✨', name: 'Luxury Gold',    desc: 'Premium elegant',         layout: 6    },
-  { key: 'L7',      icon: '📊', name: 'Spec Grid',      desc: '6-spec comparison grid',  layout: 7    },
-  { key: 'L8',      icon: '🌙', name: 'Neon Glow',      desc: 'Gaming neon aesthetic',   layout: 8    },
-  { key: 'L9',      icon: '📋', name: 'Minimal Split',  desc: 'Clean split with bars',   layout: 9    },
-  { key: 'L10',     icon: '💥', name: 'Mega Splash',    desc: 'Bold offer banner',       layout: 10   },
-];
-const STYLE_PREV = {
-  id: 0, name: 'Samsung Galaxy S25 Ultra', brand: 'Samsung',
-  ram: '12', rom: '256', battery: '5000',
-  camera: '200', chip: 'Snapdragon 8 Gen 3', display: '6.8',
-  has5g: true, price: '49900', oldPrice: '55000',
-  featuredSpec: '', theme: 0, filled: false, ellipsis: false,
-  classic: false, romColor: '', batteryColor: '',
+const PREVIEW_CARD_PROPS = {
+  onClick: () => {}, onDelete: () => {}, onSave: () => {},
+  active: false, isDragging: false, dragOverClass: '',
+  onDragStart: () => {}, onDragEnd: () => {}, onDragOver: () => {},
+  onDragEnter: () => {}, onDragLeave: () => {}, onDrop: () => {},
+  preview: true,
 };
 
+function StyleSample({ styleKey, font, onCreate, onDragStart, onDragEnd }) {
+  const meta = getStyleMeta(styleKey);
+  const sampleSticker = createSticker({
+    styleKey,
+    gridCols: meta.defaultGridCols,
+    gridRows: meta.defaultGridRows,
+    data: SAMPLE_STICKER_DATA,
+  });
+  const cardEl = styleKey === 'classic'
+    ? <StickerCard p={sampleSticker.data} font={font} {...PREVIEW_CARD_PROPS} />
+    : <PriceTagCard p={sampleSticker.data} font={font} forcedLayout={meta.layout} {...PREVIEW_CARD_PROPS} />;
+
+  return (
+    <div draggable onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onCreate}
+      style={{ border: `1px solid ${M.outlineVar}`, borderRadius: 16, overflow: 'hidden', background: '#fff', cursor: 'grab', boxShadow: M.shadowSm }}>
+      <div style={{ height: 126, overflow: 'hidden', background: M.s2 }}>
+        <div style={{ transform: 'scale(0.48)', transformOrigin: 'top left', width: '208%', pointerEvents: 'none' }}>
+          {cardEl}
+        </div>
+      </div>
+      <div style={{ padding: '10px 12px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: M.onSurface }}>{meta.name}</div>
+            <div style={{ fontSize: 10, color: M.onSurfaceVar, marginTop: 2 }}>{meta.desc}</div>
+          </div>
+          <div style={{ padding: '3px 8px', borderRadius: R.full, background: M.s2, color: M.onSurfaceVar, fontSize: 10, fontWeight: 700 }}>
+            {`${meta.defaultGridCols} x ${meta.defaultGridRows || 1}`}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 export default function App() {
-  const [products,      setProducts]      = useState(INITIAL);
-  const [font,          setFont]          = useState('Kanit');
-  const [gridCols,      setGridCols]      = useState(3);
-  const [paperSize,     setPaperSize]     = useState('a4');
-  const [modal,         setModal]         = useState(null);
-  const [form,          setForm]          = useState(EMPTY);
-  const [addToShelf,    setAddToShelf]    = useState(false);
-  const [page,          setPage]          = useState(0);
-  const [busy,          setBusy]          = useState(false);
-  const [toast,         setToast]         = useState('');
-  const [clearConfirm,  setClearConfirm]  = useState(false);
-  const [savedCards,    setSavedCards]    = useState([]);
-  const [csvOpen,       setCsvOpen]       = useState(false);
+  const STYLE_DRAWER_WIDTH = 460;
+  const initialWorkspace = hydrateWorkspaceSnapshot({
+    stickers: createInitialStickers(),
+    font: 'Kanit',
+    paperSize: 'a4',
+    defaultGridCols: 1,
+    selectedStyleKey: 'classic',
+  });
+
+  const [stickers, setStickers] = useState(initialWorkspace.stickers);
+  const [font, setFont] = useState(initialWorkspace.font);
+  const [paperSize, setPaperSize] = useState(initialWorkspace.paperSize);
+  const [defaultGridCols, setDefaultGridCols] = useState(initialWorkspace.defaultGridCols);
+  const [selectedStyleKey, setSelectedStyleKey] = useState(initialWorkspace.selectedStyleKey);
+  const [savedCards, setSavedCards] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [csvOpen, setCsvOpen] = useState(false);
   const [shelfPickOpen, setShelfPickOpen] = useState(false);
-  const [dlOpen,        setDlOpen]        = useState(false);
-  const [previewImg,    setPreviewImg]    = useState(null);
-  const [dragSrcId,     setDragSrcId]     = useState(null);
-  const [dragSrcType,   setDragSrcType]   = useState(null);
-  const [dragShelfCard, setDragShelfCard] = useState(null);
-  const [dragOverSlot,  setDragOverSlot]  = useState(null);
-  const [dragOverShelf, setDragOverShelf] = useState(false);
-  /* ── new ── */
-  const [templates,     setTemplates]     = useState([]);
   const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [defaultStyle,  setDefaultStyle]  = useState({ theme: 0, filled: false, ellipsis: false });
-  const [cardStyle,       setCardStyle]       = useState('classic');
-  const [stylePickerOpen, setStylePickerOpen] = useState(false);
+  const [styleDrawerOpen, setStyleDrawerOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState(normalizeStickerData({}, 'classic'));
+  const [formStyleKey, setFormStyleKey] = useState('classic');
+  const [formGridCols, setFormGridCols] = useState(1);
+  const [formGridRows, setFormGridRows] = useState(1);
+  const [addToShelf, setAddToShelf] = useState(false);
+  const [page, setPage] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState('');
+  const [dlOpen, setDlOpen] = useState(false);
+  const [previewImg, setPreviewImg] = useState(null);
+  const [clearConfirm, setClearConfirm] = useState(false);
+  const [dragState, setDragState] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const [dragOverShelf, setDragOverShelf] = useState(false);
+  const [dragOverStyleDrawer, setDragOverStyleDrawer] = useState(false);
 
-  const canvasRef           = useRef(null);
-  const savedLoadedRef      = useRef(false);
-  const touchDragRef        = useRef(null);
-  const templatesInitRef    = useRef(false);
-  const defaultStyleInitRef = useRef(false);
+  const canvasRef = useRef(null);
+  const workspaceLoadedRef = useRef(false);
+  const shelfLoadedRef = useRef(false);
+  const templatesLoadedRef = useRef(false);
 
-  const totalPages  = Math.max(1, Math.ceil(products.length / PER_PAGE));
-  const pageProds   = products.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
-  const emptySlots  = PER_PAGE - pageProds.length;
-  const paper       = PAPER_SIZES.find(s => s.id === paperSize) || PAPER_SIZES[1];
-  const isDragging  = dragSrcId !== null;
-  const activeColor = THEMES[form.theme]?.color || M.primary;
-  const canSave     = !!(form.name && form.rom && form.battery && form.price);
-  const isCurrentDefault =
-    form.theme === defaultStyle.theme &&
-    !!form.filled  === !!defaultStyle.filled &&
-    !!form.ellipsis === !!defaultStyle.ellipsis;
+  const paper = PAPER_SIZES.find(size => size.id === paperSize) || PAPER_SIZES[1];
+  const pageRows = getPageRowsForPaper(paper);
+  const pages = packStickerPages(stickers, paper);
+  const totalPages = pages.length;
+  const currentPage = pages[Math.min(page, totalPages - 1)] || pages[0];
+  const currentPlacements = currentPage?.placements || [];
+  const pagePreviewAspect = `${paper.h} / ${paper.w}`;
+  const reservedDrawerSpace = styleDrawerOpen ? STYLE_DRAWER_WIDTH + 24 : 0;
+  const canSave = !!(formData.name && formData.rom && formData.battery && formData.price);
+  const isDragging = !!dragState;
 
-  /* ── Shelf persistence (window.storage + localStorage fallback) */
   useEffect(() => {
-    (async () => {
+    const workspaceRaw = lsGet(LS_WORKSPACE);
+    if (workspaceRaw) {
       try {
-        const r = await window.storage?.get('pts_saved');
-        if (r?.value) { setSavedCards(JSON.parse(r.value)); savedLoadedRef.current = true; return; }
+        const workspace = hydrateWorkspaceSnapshot(JSON.parse(workspaceRaw));
+        setStickers(workspace.stickers);
+        setFont(workspace.font);
+        setPaperSize(workspace.paperSize);
+        setDefaultGridCols(workspace.defaultGridCols);
+        setSelectedStyleKey(workspace.selectedStyleKey);
       } catch {}
-      const v = lsGet('pts_saved');
-      if (v) try { setSavedCards(JSON.parse(v)); } catch {}
-      savedLoadedRef.current = true;
-    })();
+    }
+    workspaceLoadedRef.current = true;
   }, []);
+
   useEffect(() => {
-    if (!savedLoadedRef.current) return;
-    window.storage?.set('pts_saved', JSON.stringify(savedCards)).catch(() => {});
-    lsSet('pts_saved', JSON.stringify(savedCards));
+    const shelfRaw = lsGet(LS_SHELF);
+    if (shelfRaw) {
+      try {
+        setSavedCards(hydrateShelfItems(JSON.parse(shelfRaw)));
+      } catch {}
+    }
+    shelfLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    const templatesRaw = lsGet(LS_TEMPLATES);
+    if (templatesRaw) {
+      try {
+        setTemplates(JSON.parse(templatesRaw));
+      } catch {}
+    }
+    templatesLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceLoadedRef.current) return;
+    lsSet(LS_WORKSPACE, JSON.stringify(createWorkspaceSnapshot({
+      font,
+      paperSize,
+      defaultGridCols,
+      selectedStyleKey,
+      stickers,
+    })));
+  }, [font, paperSize, defaultGridCols, selectedStyleKey, stickers]);
+
+  useEffect(() => {
+    if (!shelfLoadedRef.current) return;
+    lsSet(LS_SHELF, JSON.stringify(savedCards));
   }, [savedCards]);
 
-  /* ── Templates persistence (localStorage) ───────────────────── */
   useEffect(() => {
-    const v = lsGet('pts_templates');
-    if (v) try { setTemplates(JSON.parse(v)); } catch {}
-    templatesInitRef.current = true;
-  }, []);
-  useEffect(() => {
-    if (!templatesInitRef.current) return;
-    lsSet('pts_templates', JSON.stringify(templates));
+    if (!templatesLoadedRef.current) return;
+    lsSet(LS_TEMPLATES, JSON.stringify(templates));
   }, [templates]);
 
-  /* ── Default card style persistence (localStorage) ──────────── */
   useEffect(() => {
-    const v = lsGet('pts_default_style');
-    if (v) try { setDefaultStyle(JSON.parse(v)); } catch {}
-    defaultStyleInitRef.current = true;
-  }, []);
-  useEffect(() => {
-    if (!defaultStyleInitRef.current) return;
-    lsSet('pts_default_style', JSON.stringify(defaultStyle));
-  }, [defaultStyle]);
+    if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
+  }, [page, totalPages]);
 
-  /* ── CSS + Google Fonts ──────────────────────────────────── */
   useEffect(() => {
-    FONTS.forEach(f => {
-      const id = `gf-${f.name.replace(/\s/g, '-')}`;
+    FONTS.forEach(fontDef => {
+      const id = `gf-${fontDef.name.replace(/\s/g, '-')}`;
       if (document.getElementById(id)) return;
-      const l = document.createElement('link');
-      l.id = id; l.rel = 'stylesheet';
-      l.href = `https://fonts.googleapis.com/css2?family=${f.css}&display=swap`;
-      document.head.appendChild(l);
+      const link = document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = `https://fonts.googleapis.com/css2?family=${fontDef.css}&display=swap`;
+      document.head.appendChild(link);
     });
   }, []);
 
-  /* ── Helpers ─────────────────────────────────────────────── */
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500); }
-  function openAdd() {
-    setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis, classic: cardStyle === 'classic' });
-    setAddToShelf(false); setModal('add');
-  }
-  function openEmptySlot() {
-    if (savedCards.length > 0) { setShelfPickOpen(true); }
-    else {
-      setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis, classic: cardStyle === 'classic' });
-      setAddToShelf(false); setModal('add');
-    }
-  }
-  function openEdit(p) {
-    setForm({
-      name: p.name, brand: p.brand || '', ram: p.ram, rom: p.rom,
-      battery: p.battery, camera: p.camera || '', chip: p.chip || '',
-      display: p.display || '', has5g: !!p.has5g,
-      price: p.price, oldPrice: p.oldPrice || '', featuredSpec: p.featuredSpec || '',
-      theme: p.theme, filled: !!p.filled, ellipsis: !!p.ellipsis,
-      classic: !!p.classic, romColor: p.romColor || '', batteryColor: p.batteryColor || '',
-    });
-    setAddToShelf(false); setModal(p.id);
+  function showToast(message) {
+    setToast(message);
+    setTimeout(() => setToast(''), 2500);
   }
 
-  function save() {
-    if (!form.name || !form.rom || !form.battery || !form.price) return;
-    const nc = { ...form, id: Date.now() };
-    if (modal === 'add') {
-      setProducts(prev => { const n = [...prev, nc]; setPage(Math.ceil(n.length / PER_PAGE) - 1); return n; });
-      if (addToShelf) { setSavedCards(prev => [...prev, { ...form, savedId: Date.now() + 1 }]); showToast('✅ Added to grid & shelf!'); }
-      else showToast('✅ Added!');
+  function createStickerFromStyle(styleKey, dataOverrides = {}, gridColsOverride) {
+    const style = getStyleMeta(styleKey);
+    return createSticker({
+      styleKey: style.key,
+      gridCols: gridColsOverride ?? defaultGridCols ?? style.defaultGridCols,
+      gridRows: style.defaultGridRows ?? 1,
+      data: {
+        ...SAMPLE_STICKER_DATA,
+        ...dataOverrides,
+      },
+    });
+  }
+
+  function openNewSticker(styleKey = selectedStyleKey) {
+    const style = getStyleMeta(styleKey);
+    setEditingId(null);
+    setFormStyleKey(style.key);
+    setFormGridCols(clampGridCols(defaultGridCols ?? style.defaultGridCols));
+    setFormGridRows(clampGridRows(style.defaultGridRows ?? 1));
+    setFormData(normalizeStickerData(SAMPLE_STICKER_DATA, style.key));
+    setAddToShelf(false);
+    setEditorOpen(true);
+  }
+
+  function openEditSticker(sticker) {
+    setEditingId(sticker.id);
+    setFormStyleKey(sticker.styleKey);
+    setFormGridCols(clampGridCols(sticker.gridCols));
+    setFormGridRows(clampGridRows(sticker.gridRows));
+    setFormData(normalizeStickerData(sticker.data, sticker.styleKey));
+    setAddToShelf(false);
+    setEditorOpen(true);
+  }
+
+  function closeEditor() {
+    setEditorOpen(false);
+    setEditingId(null);
+  }
+
+  function saveEditor() {
+    if (!canSave) return;
+    const style = getStyleMeta(formStyleKey);
+    const sticker = createSticker({
+      id: editingId || undefined,
+      styleKey: formStyleKey,
+      gridCols: style.fixedSize ? style.defaultGridCols : formGridCols,
+      gridRows: style.fixedSize ? style.defaultGridRows : formGridRows,
+      data: formData,
+    });
+
+    if (editingId) {
+      setStickers(prev => prev.map(item => (item.id === editingId ? sticker : item)));
+      showToast('Sticker updated');
     } else {
-      setProducts(prev => prev.map(p => p.id === modal ? { ...form, id: modal } : p));
-      if (addToShelf) { setSavedCards(prev => [...prev, { ...form, savedId: Date.now() + 1 }]); showToast('💾 Saved & added to shelf!'); }
-      else showToast('💾 Saved!');
+      setStickers(prev => [...prev, sticker]);
+      showToast('Sticker added');
     }
-    setModal(null);
+
+    if (addToShelf) {
+      setSavedCards(prev => [...prev, createShelfItem(sticker)]);
+    }
+
+    closeEditor();
   }
 
-  function remove(id) {
-    setProducts(prev => { const n = prev.filter(p => p.id !== id); const tp = Math.max(1, Math.ceil(n.length / PER_PAGE)); if (page >= tp) setPage(tp - 1); return n; });
-    showToast('Deleted');
+  function removeSticker(id) {
+    setStickers(prev => prev.filter(sticker => sticker.id !== id));
+    showToast('Sticker deleted');
   }
+
   function clearAll() {
-    if (!clearConfirm) { setClearConfirm(true); setTimeout(() => setClearConfirm(false), 3000); return; }
-    setProducts([]); setPage(0); setClearConfirm(false); showToast('Grid cleared');
+    if (!clearConfirm) {
+      setClearConfirm(true);
+      setTimeout(() => setClearConfirm(false), 2500);
+      return;
+    }
+    setStickers([]);
+    setPage(0);
+    setClearConfirm(false);
+    showToast('Grid cleared');
   }
-  function saveCardToShelf(p) {
-    setSavedCards(prev => [...prev, {
-      name: p.name, brand: p.brand, ram: p.ram, rom: p.rom,
-      battery: p.battery, camera: p.camera, chip: p.chip,
-      display: p.display, has5g: p.has5g,
-      price: p.price, oldPrice: p.oldPrice, featuredSpec: p.featuredSpec,
-      theme: p.theme, filled: p.filled,
-      classic: !!p.classic, romColor: p.romColor || '', batteryColor: p.batteryColor || '',
-      savedId: Date.now(),
-    }]);
-    showToast('⭐ Saved to shelf!');
+
+  function saveStickerToShelf(sticker) {
+    setSavedCards(prev => [...prev, createShelfItem(sticker)]);
+    showToast('Saved to shelf');
   }
-  function removeSavedCard(savedId) { setSavedCards(prev => prev.filter(s => s.savedId !== savedId)); }
-  function addSavedToGrid(sc) {
-    const clone = { ...sc, id: Date.now() }; delete clone.savedId;
-    setProducts(prev => {
-      const n = [...prev, clone];
-      const cc = prev.slice(page * PER_PAGE, (page + 1) * PER_PAGE).length;
-      if (cc >= PER_PAGE) setPage(Math.ceil(n.length / PER_PAGE) - 1);
-      return n;
+
+  function removeShelfItem(id) {
+    setSavedCards(prev => prev.filter(item => item.id !== id));
+  }
+
+  function addShelfItemToGrid(item) {
+    const clone = cloneSticker(item.sticker);
+    setStickers(prev => [...prev, clone]);
+    showToast('Added from shelf');
+  }
+
+  function snapshotCurrentWorkspace(name = '') {
+    return createWorkspaceSnapshot({
+      name,
+      font,
+      paperSize,
+      defaultGridCols,
+      selectedStyleKey,
+      stickers,
     });
-    showToast('📋 Added to grid!');
+  }
+
+  function loadWorkspace(snapshot) {
+    const workspace = hydrateWorkspaceSnapshot(snapshot);
+    setStickers(workspace.stickers);
+    setFont(workspace.font);
+    setPaperSize(workspace.paperSize);
+    setDefaultGridCols(workspace.defaultGridCols);
+    setSelectedStyleKey(workspace.selectedStyleKey);
+    setPage(0);
+  }
+
+  function saveTemplate(name) {
+    const snapshot = snapshotCurrentWorkspace(name);
+    const template = {
+      id: uid('tpl'),
+      name: snapshot.name,
+      savedAt: new Date().toISOString(),
+      snapshot,
+    };
+    setTemplates(prev => [...prev, template]);
+    showToast('Template saved');
+  }
+
+  function loadTemplate(template) {
+    loadWorkspace(template.snapshot || template);
+    showToast('Template loaded');
+  }
+
+  function deleteTemplate(id) {
+    setTemplates(prev => prev.filter(template => template.id !== id));
+    showToast('Template removed');
+  }
+
+  function exportCurrentWorkspaceJson(name = '') {
+    const snapshot = snapshotCurrentWorkspace(name);
+    downloadJson(`${(snapshot.name || 'workspace').replace(/\s+/g, '-').toLowerCase()}.json`, snapshot);
+    showToast('Workspace JSON exported');
+  }
+
+  async function importTemplateJson(file) {
+    try {
+      const payload = await readJsonFile(file);
+      const snapshot = payload.snapshot ? payload.snapshot : payload;
+      const workspace = hydrateWorkspaceSnapshot(snapshot);
+      const template = {
+        id: uid('tpl'),
+        name: workspace.name || payload.name || `Imported ${new Date().toLocaleDateString()}`,
+        savedAt: new Date().toISOString(),
+        snapshot,
+      };
+      setTemplates(prev => [...prev, template]);
+      loadWorkspace(snapshot);
+      showToast('Workspace JSON imported');
+    } catch (error) {
+      showToast(error.message || 'Import failed');
+    }
+  }
+
+  function exportShelfJson() {
+    downloadJson(`shelf-${new Date().toISOString().slice(0, 10)}.json`, {
+      version: 2,
+      kind: 'shelf',
+      exportedAt: new Date().toISOString(),
+      items: savedCards,
+    });
+    showToast('Shelf JSON exported');
+  }
+
+  async function importShelfJson(file) {
+    try {
+      const payload = await readJsonFile(file);
+      const items = hydrateShelfItems(payload.items || payload);
+      setSavedCards(prev => [...prev, ...items]);
+      showToast(`Imported ${items.length} shelf items`);
+    } catch (error) {
+      showToast(error.message || 'Import failed');
+    }
   }
 
   function handleCsvImport(rows, mode) {
-    const items = rows.map(r => ({ ...r, id: Date.now() + (Math.random() * 10000 | 0) }));
-    if (mode === 'replace') { setProducts(items); setPage(0); showToast(`🎉 Imported ${items.length} products`); }
-    else { setProducts(prev => { const n = [...prev, ...items]; setPage(Math.ceil(n.length / PER_PAGE) - 1); return n; }); showToast(`📥 Imported ${items.length} products`); }
-  }
+    const imported = rows.map(row => createSticker({
+      styleKey: selectedStyleKey,
+      gridCols: defaultGridCols,
+      data: row,
+    }));
 
-  /* ── Template helpers ───────────────────────────────────────── */
-  function saveTemplate(name) {
-    setTemplates(prev => [...prev, {
-      id: Date.now(), name,
-      products: [...products], font, gridCols, paperSize,
-      savedAt: new Date().toISOString(),
-    }]);
-    showToast(`📑 Template "${name}" saved!`);
-  }
-  function loadTemplate(t) {
-    setProducts(t.products.map(p => ({ ...p, id: Date.now() + (Math.random() * 10000 | 0) })));
-    setFont(t.font); setGridCols(t.gridCols); setPaperSize(t.paperSize); setPage(0);
-    showToast(`📑 "${t.name}" loaded!`);
-  }
-  function deleteTemplate(id) {
-    setTemplates(prev => prev.filter(t => t.id !== id));
-    showToast('Template deleted');
-  }
-
-  /* ── Default card style helper ──────────────────────────────── */
-  function applyDefaultStyle() {
-    setDefaultStyle({ theme: form.theme, filled: form.filled, ellipsis: form.ellipsis });
-    showToast('✅ Default card style saved!');
-  }
-
-  /* ── Drag helpers ────────────────────────────────────────── */
-  function resetDrag() { setDragSrcId(null); setDragSrcType(null); setDragOverSlot(null); setDragShelfCard(null); setDragOverShelf(false); }
-  function handleGridDragStart(id, e)  { e.dataTransfer.effectAllowed = 'copy'; setDragSrcId(id); setDragSrcType('grid'); }
-  function handleShelfDragStart(s, e)  { e.dataTransfer.effectAllowed = 'copy'; setDragSrcId(s.savedId); setDragSrcType('shelf'); setDragShelfCard(s); }
-
-  function handleDropOnCard(targetId, e) {
-    e.preventDefault(); setDragOverSlot(null);
-    if (dragSrcType === 'shelf') {
-      if (!dragShelfCard) { resetDrag(); return; }
-      const clone = { ...dragShelfCard, id: Date.now() }; delete clone.savedId;
-      setProducts(prev => { const idx = prev.findIndex(p => p.id === targetId); const n = [...prev]; n.splice(idx, 0, clone); return n; });
-      resetDrag(); showToast('📋 Added from shelf!'); return;
-    }
-    if (!dragSrcId || dragSrcId === targetId) { resetDrag(); return; }
-    const src = products.find(p => p.id === dragSrcId);
-    if (!src) { resetDrag(); return; }
-    setProducts(prev => { const idx = prev.findIndex(p => p.id === targetId); const n = [...prev]; n.splice(idx, 0, { ...src, id: Date.now() }); return n; });
-    resetDrag(); showToast('📋 Duplicated!');
-  }
-  function handleDropOnEmpty(e) {
-    e.preventDefault(); setDragOverSlot(null);
-    if (dragSrcType === 'shelf') {
-      if (!dragShelfCard) { resetDrag(); return; }
-      const clone = { ...dragShelfCard, id: Date.now() }; delete clone.savedId;
-      setProducts(prev => [clone, ...prev]);
+    if (mode === 'replace') {
+      setStickers(imported);
       setPage(0);
-      resetDrag(); showToast('📋 Added to top!'); return;
+    } else {
+      setStickers(prev => [...prev, ...imported]);
     }
-    if (!dragSrcId) { resetDrag(); return; }
-    const src = products.find(p => p.id === dragSrcId);
-    if (!src) { resetDrag(); return; }
-    setProducts(prev => [...prev, { ...src, id: Date.now() }]); resetDrag(); showToast('📋 Duplicated!');
-  }
-  function handleDropOnShelf(e) {
-    e.preventDefault(); setDragOverShelf(false);
-    if (dragSrcType !== 'grid') { resetDrag(); return; }
-    const src = products.find(p => p.id === dragSrcId);
-    if (!src) { resetDrag(); return; }
-    saveCardToShelf(src); resetDrag();
+    showToast(`Imported ${imported.length} stickers`);
   }
 
-  /* ── Touch drag (mobile) ─────────────────────────────────── */
-  function handleTouchDragStart(id, type, shelfCard, e) {
-    const t = e.touches[0];
-    touchDragRef.current = { id, type, shelfCard, startX: t.clientX, startY: t.clientY };
-    setDragSrcId(id); setDragSrcType(type); if (shelfCard) setDragShelfCard(shelfCard);
-  }
-  function handleTouchDragMove(e) {
-    if (!touchDragRef.current) return;
-    e.preventDefault();
-    const t  = e.touches[0];
-    const el = document.elementFromPoint(t.clientX, t.clientY);
-    if (el) { const card = el.closest('[data-cardid]'); setDragOverSlot(card ? `c-${card.dataset.cardid}` : null); }
-  }
-  function handleTouchDragEnd(e) {
-    if (!touchDragRef.current) { resetDrag(); return; }
-    const t  = e.changedTouches[0];
-    const el = document.elementFromPoint(t.clientX, t.clientY);
-    const dr = touchDragRef.current;
-    touchDragRef.current = null;
-    if (el) {
-      const card  = el.closest('[data-cardid]');
-      const empty = el.closest('[data-emptyslot]');
-      if (card) {
-        const targetId = Number(card.dataset.cardid);
-        if (dr.type === 'shelf' && dr.shelfCard) {
-          const clone = { ...dr.shelfCard, id: Date.now() }; delete clone.savedId;
-          setProducts(prev => { const idx = prev.findIndex(p => p.id === targetId); const n = [...prev]; n.splice(idx, 0, clone); return n; });
-          showToast('📋 Added from shelf!');
-        } else if (dr.id !== targetId) {
-          const src = products.find(p => p.id === dr.id);
-          if (src) { setProducts(prev => { const idx = prev.findIndex(p => p.id === targetId); const n = [...prev]; n.splice(idx, 0, { ...src, id: Date.now() }); return n; }); showToast('📋 Duplicated!'); }
-        }
-      } else if (empty) {
-        if (dr.type === 'shelf' && dr.shelfCard) {
-          const clone = { ...dr.shelfCard, id: Date.now() }; delete clone.savedId;
-          setProducts(prev => [clone, ...prev]);
-          setPage(0); showToast('📋 Added to top!');
-        } else { const src = products.find(p => p.id === dr.id); if (src) { setProducts(prev => [...prev, { ...src, id: Date.now() }]); showToast('📋 Duplicated!'); } }
-      }
+  function buildStickerFromDrag() {
+    if (!dragState) return null;
+
+    if (dragState.type === 'style') {
+      return createStickerFromStyle(dragState.styleKey);
     }
+
+    if (dragState.type === 'shelf') {
+      const shelfItem = savedCards.find(item => item.id === dragState.itemId);
+      return shelfItem ? cloneSticker(shelfItem.sticker) : null;
+    }
+
+    if (dragState.type === 'grid') {
+      const sticker = stickers.find(item => item.id === dragState.stickerId);
+      return sticker ? cloneSticker(sticker) : null;
+    }
+
+    return null;
+  }
+
+  function resetDrag() {
+    setDragState(null);
+    setDragOverId(null);
+    setDragOverShelf(false);
+    setDragOverStyleDrawer(false);
+  }
+
+  function handleGridDragStart(sticker, event) {
+    event.dataTransfer.effectAllowed = 'copy';
+    setDragState({ type: 'grid', stickerId: sticker.id });
+  }
+
+  function handleShelfDragStart(item, event) {
+    event.dataTransfer.effectAllowed = 'copy';
+    setDragState({ type: 'shelf', itemId: item.id });
+  }
+
+  function handleStyleDragStart(styleKey, event) {
+    event.dataTransfer.effectAllowed = 'copy';
+    setSelectedStyleKey(styleKey);
+    setDragState({ type: 'style', styleKey });
+  }
+
+  function insertStickerAt(index, sticker) {
+    setStickers(prev => {
+      const next = [...prev];
+      next.splice(index, 0, sticker);
+      return next;
+    });
+  }
+
+  function handleDropBeforeSticker(targetId) {
+    if (dragState?.type === 'grid' && dragState.stickerId === targetId) {
+      resetDrag();
+      return;
+    }
+    const newSticker = buildStickerFromDrag();
+    if (!newSticker) {
+      resetDrag();
+      return;
+    }
+    const targetIndex = stickers.findIndex(sticker => sticker.id === targetId);
+    if (targetIndex < 0) {
+      resetDrag();
+      return;
+    }
+    insertStickerAt(targetIndex, newSticker);
+    resetDrag();
+    showToast('Sticker inserted');
+  }
+
+  function handleDropAtPageEnd() {
+    const newSticker = buildStickerFromDrag();
+    if (!newSticker) {
+      resetDrag();
+      return;
+    }
+
+    const lastSticker = currentPlacements[currentPlacements.length - 1]?.sticker;
+    if (!lastSticker) {
+      insertStickerAt(stickers.length, newSticker);
+    } else {
+      const lastIndex = stickers.findIndex(sticker => sticker.id === lastSticker.id);
+      insertStickerAt(lastIndex + 1, newSticker);
+    }
+    resetDrag();
+    showToast('Sticker added to grid');
+  }
+
+  function handleDropOnShelf() {
+    if (!dragState || dragState.type !== 'grid') {
+      resetDrag();
+      return;
+    }
+    const source = stickers.find(sticker => sticker.id === dragState.stickerId);
+    if (!source) {
+      resetDrag();
+      return;
+    }
+    saveStickerToShelf(source);
     resetDrag();
   }
 
-  /* ── Canvas render ───────────────────────────────────────── */
-  async function renderToCanvas() {
-    try { await Promise.all([`400 22px '${font}'`, `700 28px '${font}'`, `900 44px '${font}'`].map(s => document.fonts.load(s))); } catch {}
-    await new Promise(r => setTimeout(r, 300));
+  async function renderPageToCanvas(pageIndex) {
+    try {
+      await Promise.all([`400 22px '${font}'`, `700 28px '${font}'`, `900 44px '${font}'`].map(fontSpec => document.fonts.load(fontSpec)));
+    } catch {}
+
+    await new Promise(resolve => setTimeout(resolve, 120));
+
+    const pageData = pages[pageIndex] || pages[0];
     const canvas = canvasRef.current;
-    const { w: W, h: H } = paper;
-    canvas.width = W; canvas.height = H;
+    const { w: width, h: height } = paper;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#f0f0f0'; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff';    ctx.fillRect(30, 30, W - 60, H - 60);
-    const cols  = gridCols;
-    const rows2 = Math.ceil(PER_PAGE / cols);
-    const mx = 70, my = 80, gx = 28, gy = 28;
-    const sw = (W - mx * 2 - gx * (cols - 1)) / cols;
-    const sh = (H - my * 2 - gy * (rows2 - 1)) / rows2;
-    products.slice(page * PER_PAGE, (page + 1) * PER_PAGE).forEach((p, i) => {
-      const col = i % cols, row = Math.floor(i / cols);
-      drawSticker(ctx, p, mx + col * (sw + gx), my + row * (sh + gy), sw, sh, font);
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(30, 30, width - 60, height - 60);
+
+    const cols = BASE_GRID_COLS;
+    const rows = pageRows;
+    const marginX = 70;
+    const marginY = 80;
+    const gapX = 18;
+    const gapY = 18;
+    const cellWidth = (width - marginX * 2 - gapX * (cols - 1)) / cols;
+    const cellHeight = (height - marginY * 2 - gapY * (rows - 1)) / rows;
+
+    pageData.placements.forEach(({ sticker, col, row, span }) => {
+      const x = marginX + col * (cellWidth + gapX);
+      const y = marginY + row * (cellHeight + gapY);
+      const stickerWidth = cellWidth * span + gapX * (span - 1);
+      const stickerHeight = cellHeight * (sticker.gridRows || 1) + gapY * ((sticker.gridRows || 1) - 1);
+      drawSticker(ctx, sticker.data, x, y, stickerWidth, stickerHeight, font);
     });
-    // Cut guides
-    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
-    for (let c = 1; c < cols; c++) {
-      const cx = mx + c * (sw + gx) - gx / 2;
-      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, 28); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, H - 28); ctx.lineTo(cx, H); ctx.stroke();
+
+    ctx.strokeStyle = '#bbb';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 5]);
+    for (let col = 1; col < cols; col += 1) {
+      const x = marginX + col * (cellWidth + gapX) - gapX / 2;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 28);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, height - 28);
+      ctx.lineTo(x, height);
+      ctx.stroke();
     }
-    for (let r = 1; r < rows2; r++) {
-      const ry = my + r * (sh + gy) - gy / 2;
-      ctx.beginPath(); ctx.moveTo(0, ry); ctx.lineTo(28, ry); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(W - 28, ry); ctx.lineTo(W, ry); ctx.stroke();
+    for (let row = 1; row < rows; row += 1) {
+      const y = marginY + row * (cellHeight + gapY) - gapY / 2;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(28, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(width - 28, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
     }
     ctx.setLineDash([]);
+
     return canvas.toDataURL('image/png');
   }
 
   async function generateImage() {
     setBusy(true);
-    const imgData = await renderToCanvas();
-    const { label: sL } = paper;
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) {
-      setPreviewImg({ src: imgData, label: sL, page: page + 1 });
+    try {
+      const dataUrl = await renderPageToCanvas(page);
+      const label = paper.label;
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile) {
+        setPreviewImg({ src: dataUrl, label, page: page + 1 });
+      } else {
+        triggerDownload(`stickers-${label.toLowerCase()}-p${page + 1}.png`, dataUrl);
+        showToast('PNG exported');
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('PNG export failed');
+    } finally {
+      setBusy(false);
       setDlOpen(false);
-    } else {
-      const a = document.createElement('a');
-      a.download = `stickers-${sL.toLowerCase()}-p${page + 1}.png`;
-      a.href = imgData; a.click();
-      showToast(`🖨️ Downloaded ${sL}!`);
     }
-    setBusy(false);
   }
 
   async function generatePDF() {
+    const popup = window.open('', '_blank');
     setBusy(true);
-    const imgData = await renderToCanvas();
-    const { label: sL } = paper;
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(`<!DOCTYPE html><html><head><title>Price Tags — ${sL} Page ${page + 1}</title>
-        <style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#f0f0f0;}
-        img{width:100%;height:auto;display:block;}
-        @media print{@page{margin:0;size:auto;}body{margin:0;}}</style></head>
-        <body><img src="${imgData}" onload="window.print();"/></body></html>`);
-      win.document.close();
+    try {
+      if (!popup) {
+        showToast('Allow popups to export PDF');
+        return;
+      }
+
+      popup.document.write('<!DOCTYPE html><html><head><title>Preparing PDF...</title></head><body style="font-family:sans-serif;padding:24px">Preparing PDF...</body></html>');
+      popup.document.close();
+
+      const images = [];
+      for (let index = 0; index < pages.length; index += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        images.push(await renderPageToCanvas(index));
+      }
+
+      popup.document.open();
+      popup.document.write(`<!DOCTYPE html><html><head><title>Sticker Pages</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { background: #e9e9e9; padding: 24px; display: grid; gap: 20px; }
+          img { width: 100%; max-width: 1100px; display: block; margin: 0 auto; background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+          @media print { body { padding: 0; background: #fff; } img { page-break-after: always; box-shadow: none; } }
+        </style></head><body>${images.map(src => `<img src="${src}" />`).join('')}</body></html>`);
+      popup.document.close();
+      popup.focus();
+      popup.print();
+      showToast('PDF dialog opened');
+    } catch (error) {
+      console.error(error);
+      if (popup && !popup.closed) popup.close();
+      showToast('PDF export failed');
+    } finally {
+      setBusy(false);
+      setDlOpen(false);
     }
-    showToast('📄 PDF dialog opened!'); setBusy(false); setDlOpen(false);
   }
 
   function generateDoc() {
-    const rowsHtml = products.map(p => `
-      <tr style="background:${THEMES[p.theme].color}${p.filled ? '' : '22'}">
-        <td style="padding:8px 12px;border:1px solid #ddd;font-weight:700;color:${p.filled ? '#fff' : THEMES[p.theme].color}">${p.name}</td>
-        <td style="padding:8px 12px;border:1px solid #ddd;text-align:center">${p.ram}</td>
-        <td style="padding:8px 12px;border:1px solid #ddd;text-align:center">${p.rom}</td>
-        <td style="padding:8px 12px;border:1px solid #ddd;text-align:center">${p.battery}</td>
-        <td style="padding:8px 12px;border:1px solid #ddd;text-align:right;font-weight:900;color:${THEMES[p.theme].color}">${p.price}.-</td>
-        <td style="padding:8px 12px;border:1px solid #ddd;text-align:center">
-          <span style="background:${THEMES[p.theme].color};color:#fff;padding:3px 10px;border-radius:12px;font-size:12px">${THEMES[p.theme].label}</span>
-        </td>
-      </tr>`).join('');
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><title>Price Tag Studio — Product List</title>
-      <style>body{font-family:'Segoe UI',sans-serif;padding:32px;color:#1a1a2e;background:#f9f9ff;}
-      h1{font-size:26px;margin-bottom:4px;color:#0054A3;}
-      .meta{font-size:13px;color:#74767F;margin-bottom:24px;}
-      table{width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);}
-      thead th{background:#0054A3;color:#fff;padding:10px 12px;text-align:left;font-size:13px;letter-spacing:.5px;}
-      tbody tr:nth-child(even){filter:brightness(.97);}
-      tfoot td{background:#f0f0f0;padding:10px 12px;font-size:12px;color:#555;}
-      @media print{@page{margin:20mm;} body{padding:0;}}
+    const rowsHtml = stickers.map(sticker => {
+      const data = sticker.data;
+      const theme = THEMES[data.theme].color;
+      return `
+        <tr style="background:${theme}${data.filled ? '' : '22'}">
+          <td style="padding:8px 12px;border:1px solid #ddd;font-weight:700;color:${data.filled ? '#fff' : theme}">${data.name}</td>
+          <td style="padding:8px 12px;border:1px solid #ddd">${getStyleMeta(sticker.styleKey).name}</td>
+          <td style="padding:8px 12px;border:1px solid #ddd;text-align:center">${sticker.gridCols}</td>
+          <td style="padding:8px 12px;border:1px solid #ddd;text-align:center">${data.ram}</td>
+          <td style="padding:8px 12px;border:1px solid #ddd;text-align:center">${data.rom}</td>
+          <td style="padding:8px 12px;border:1px solid #ddd;text-align:right;font-weight:900;color:${theme}">${data.price}.-</td>
+        </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+      <title>Sticker Workspace</title>
+      <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 32px; background: #f7f7f7; color: #111; }
+        h1 { font-size: 26px; margin-bottom: 4px; }
+        .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 3px 16px rgba(0,0,0,0.08); }
+        th { background: #111; color: #fff; padding: 10px 12px; text-align: left; font-size: 12px; }
+        @media print { body { padding: 0; background: #fff; } }
       </style></head><body>
-      <h1>🏷️ Price Tag Studio</h1>
-      <div class="meta">Exported ${new Date().toLocaleString()} · ${products.length} products · Font: ${font}</div>
-      <table><thead><tr>
-        <th>Product Name</th><th>RAM (GB)</th><th>ROM (GB)</th><th>Battery (mAh)</th><th>Price (THB)</th><th>Theme</th>
-      </tr></thead><tbody>${rowsHtml}</tbody>
-      <tfoot><tr><td colspan="6">Generated by Price Tag Studio · ${products.length} total products</td></tr></tfoot>
-      </table></body></html>`;
-    const a = document.createElement('a');
-    a.href = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-    a.download = `price-tags-${new Date().toISOString().slice(0, 10)}.html`;
-    a.click();
-    showToast('📋 Document downloaded!'); setDlOpen(false);
+      <h1>Sticker Workspace</h1>
+      <div class="meta">Exported ${new Date().toLocaleString()} | ${stickers.length} stickers | ${pages.length} pages | ${font}</div>
+      <table><thead><tr><th>Name</th><th>Style</th><th>Grid</th><th>RAM</th><th>ROM</th><th>Price</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+      </body></html>`;
+
+    const link = document.createElement('a');
+    link.href = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+    link.download = `workspace-${new Date().toISOString().slice(0, 10)}.html`;
+    link.click();
+    setDlOpen(false);
+    showToast('HTML exported');
   }
 
   function generateCSV() {
-    const header = 'Name,RAM (GB),ROM (GB),Battery (mAh),Price (THB),Theme,Style\n';
-    const body   = products.map(p =>
-      `"${p.name}","${p.ram}","${p.rom}","${p.battery}","${p.price}","${THEMES[p.theme].label}","${p.filled ? 'Filled' : 'Outline'}"`
-    ).join('\n');
-    const a = document.createElement('a');
-    a.href = `data:text/csv;charset=utf-8,${encodeURIComponent(header + body)}`;
-    a.download = `price-tags-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    showToast('📊 CSV downloaded!'); setDlOpen(false);
+    const header = 'name,style,gridCols,brand,ram,rom,battery,price,theme,filled\n';
+    const body = stickers.map(sticker => {
+      const data = sticker.data;
+      return `"${data.name}","${sticker.styleKey}","${sticker.gridCols}","${data.brand}","${data.ram}","${data.rom}","${data.battery}","${data.price}","${data.theme}","${data.filled}"`;
+    }).join('\n');
+
+    const link = document.createElement('a');
+    link.href = `data:text/csv;charset=utf-8,${encodeURIComponent(header + body)}`;
+    link.download = `workspace-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    setDlOpen(false);
+    showToast('CSV exported');
   }
 
-  /* Drag props factory for StickerCard */
-  const cdp = p => ({
-    isDragging:    dragSrcId === p.id && dragSrcType === 'grid',
-    dragOverClass: dragOverSlot === `c-${p.id}` ? 'doc' : '',
-    onDragStart:   e => handleGridDragStart(p.id, e),
-    onDragEnd:     resetDrag,
-    onDragOver:    e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; },
-    onDragEnter:   e => { e.preventDefault(); setDragOverSlot(`c-${p.id}`); },
-    onDragLeave:   () => setDragOverSlot(s => s === `c-${p.id}` ? null : s),
-    onDrop:        e => handleDropOnCard(p.id, e),
-    'data-cardid': p.id,
-    onTouchStart:  e => handleTouchDragStart(p.id, 'grid', null, e),
-    onTouchMove:   handleTouchDragMove,
-    onTouchEnd:    handleTouchDragEnd,
-  });
+  function renderGridSticker(sticker, gridRow, gridCol, span, rowSpan) {
+    const styleMeta = getStyleMeta(sticker.styleKey);
 
-  /* ── Render ──────────────────────────────────────────────── */
-  return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #F7F7F7 0%, #F2F2F2 50%, #F5F5F5 100%)', fontFamily: `'${font}',sans-serif` }}>
+    const handlers = {
+      onClick: () => { if (!isDragging) openEditSticker(sticker); },
+      onDelete: () => removeSticker(sticker.id),
+      onSave: () => saveStickerToShelf(sticker),
+      active: editingId === sticker.id && editorOpen,
+      isDragging: dragState?.type === 'grid' && dragState.stickerId === sticker.id,
+      dragOverClass: dragOverId === sticker.id ? 'doc' : '',
+      onDragStart: event => handleGridDragStart(sticker, event),
+      onDragEnd: resetDrag,
+      onDragOver: event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; },
+      onDragEnter: event => { event.preventDefault(); setDragOverId(sticker.id); },
+      onDragLeave: () => setDragOverId(current => (current === sticker.id ? null : current)),
+      onDrop: event => { event.preventDefault(); handleDropBeforeSticker(sticker.id); },
+    };
 
-      {/* ── Top App Bar ── */}
-      <div style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        background: 'rgba(255,255,255,0.88)',
-        backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-        borderBottom: '1px solid rgba(99,102,241,0.1)',
-        padding: '0 20px',
-        display: 'flex', alignItems: 'center', gap: 8,
-        height: 64, boxShadow: '0 1px 24px rgba(99,102,241,0.08)',
-      }}>
-        {/* Logo */}
-        <div style={{
-          width: 40, height: 40, flexShrink: 0,
-          background: M.gradient, borderRadius: 12,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: M.shadowGlow,
-        }}>
-          <span style={{ fontSize: 20 }}>🏷️</span>
-        </div>
-        <div style={{ marginRight: 4 }}>
-          <div className="grad-text" style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.2, letterSpacing: -0.4 }}>Price Tag Studio</div>
-          <div style={{ fontSize: 10, color: M.onSurfaceVar, lineHeight: 1, fontWeight: 500 }}>
-            {products.length} stickers · P{page + 1}/{totalPages}
-          </div>
-        </div>
+    const posStyle = gridRow !== undefined
+      ? { gridColumn: `${gridCol + 1} / span ${span}`, gridRow: `${gridRow + 1} / span ${rowSpan || 1}`, minWidth: 0 }
+      : { gridColumn: `span ${clampGridCols(sticker.gridCols)}`, gridRow: `span ${clampGridRows(sticker.gridRows)}`, minWidth: 0 };
 
-        <div style={{ flex: 1 }} />
-
-        {/* Templates */}
-        <button onClick={() => setTemplatesOpen(true)} title="Workspace Templates"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 14px', borderRadius: R.full,
-            background: templates.length > 0 ? M.primaryContainer : 'rgba(0,0,0,0.04)',
-            color: templates.length > 0 ? M.primary : M.onSurfaceVar,
-            border: templates.length > 0 ? `1px solid ${M.outlineVar}` : '1px solid transparent',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            whiteSpace: 'nowrap', flexShrink: 0, transition: 'all .15s',
-          }}>
-          <IcLayers s={14} />
-          <span className="bar-label">
-            {templates.length > 0 ? `Templates (${templates.length})` : 'Templates'}
-          </span>
-        </button>
-
-        {/* Import CSV */}
-        <button onClick={() => setCsvOpen(true)} title="Import CSV"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 14px', borderRadius: R.full,
-            background: 'rgba(0,0,0,0.04)', color: M.onSurfaceVar,
-            border: '1px solid transparent',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            whiteSpace: 'nowrap', flexShrink: 0, transition: 'all .15s',
-          }}>
-          <IcUpload s={14} />
-          <span className="bar-label">Import</span>
-        </button>
-
-        {/* Export PNG — gradient pill */}
-        <button onClick={generateImage} disabled={busy} title={`Export PNG ${paper.label}`}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '9px 18px', borderRadius: R.full,
-            background: busy ? M.s3 : M.gradient,
-            color: busy ? M.onSurfaceVar : '#fff',
-            border: 'none', fontSize: 13, fontWeight: 700,
-            cursor: busy ? 'not-allowed' : 'pointer',
-            whiteSpace: 'nowrap', flexShrink: 0,
-            boxShadow: busy ? 'none' : '0 4px 14px rgba(99,102,241,0.4)',
-            transition: 'all .15s',
-          }}
-          onMouseEnter={e => { if (!busy) { e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.5)'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
-          onMouseLeave={e => { e.currentTarget.style.boxShadow = busy ? 'none' : '0 4px 14px rgba(99,102,241,0.4)'; e.currentTarget.style.transform = 'none'; }}>
-          <IcImage s={14} />
-          <span className="bar-label">{busy ? 'Exporting…' : `PNG ${paper.label}`}</span>
-        </button>
-
-        {/* Downloads dropdown */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button onClick={() => setDlOpen(o => !o)} title="Download options"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 38, height: 38, borderRadius: R.full,
-              background: dlOpen ? M.primaryContainer : 'rgba(0,0,0,0.04)',
-              color: dlOpen ? M.primary : M.onSurfaceVar,
-              border: dlOpen ? `1px solid ${M.outlineVar}` : '1px solid transparent',
-              cursor: 'pointer', transition: 'all .15s',
-            }}>
-            <IcChevDown s={16} />
-          </button>
-
-          {dlOpen && (
-            <div className="dl-panel" style={{
-              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              background: '#fff', border: `1px solid ${M.outlineVar}`,
-              borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.06)',
-              minWidth: 220, zIndex: 300, overflow: 'hidden',
-            }}>
-              <div style={{ padding: '12px 16px 8px', fontSize: 10, fontWeight: 800, color: M.onSurfaceVar, letterSpacing: 1.2, textTransform: 'uppercase' }}>
-                Download Options
-              </div>
-              {[
-                { ic: <IcImage s={18} />,  label: 'PNG Image',       sub: 'High-res print-ready',    fn: () => { generateImage(); setDlOpen(false); } },
-                { ic: <IcFile s={18} />,   label: 'PDF Document',    sub: 'Print via browser dialog', fn: generatePDF },
-                { ic: <IcFile s={18} />,   label: 'HTML Document',   sub: 'Open in Word / browser',   fn: generateDoc },
-                { ic: <IcGrid s={18} />,   label: 'CSV Spreadsheet', sub: 'All product data rows',    fn: generateCSV },
-              ].map(({ ic, label, sub, fn }) => (
-                <button key={label} onClick={fn}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-                    padding: '10px 16px', border: 'none', background: 'transparent',
-                    cursor: 'pointer', textAlign: 'left',
-                    borderTop: `1px solid rgba(0,0,0,0.04)`, transition: 'background .12s', fontFamily: 'inherit',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = M.s2}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <span style={{
-                    color: M.primary, display: 'flex', flexShrink: 0,
-                    background: M.primaryContainer, borderRadius: 8, padding: 6,
-                  }}>{ic}</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: M.onSurface }}>{label}</div>
-                    <div style={{ fontSize: 11, color: M.onSurfaceVar }}>{sub}</div>
-                  </div>
-                </button>
-              ))}
-              <div style={{ padding: '8px 16px 12px', borderTop: `1px solid rgba(0,0,0,0.04)` }}>
-                <div style={{ fontSize: 11, color: M.onSurfaceVar }}>Page {page + 1} of {totalPages} · {products.length} products</div>
-              </div>
-            </div>
-          )}
-        </div>
+    const cardProps = { key: sticker.id, p: sticker.data, font, ...handlers, 'data-cardid': sticker.id };
+    return (
+      <div key={sticker.id} style={posStyle}>
+        {styleMeta.key === 'classic'
+          ? <StickerCard {...cardProps} />
+          : <PriceTagCard {...cardProps} forcedLayout={styleMeta.layout} />}
       </div>
+    );
+  }
 
-      {/* Close download panel on outside click */}
-      {dlOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 200 }} onClick={() => setDlOpen(false)} />}
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #F7F7F7 0%, #F2F2F2 50%, #F5F5F5 100%)', fontFamily: `'${font}', sans-serif` }}>
+      <AppToolbar
+        reservedDrawerSpace={reservedDrawerSpace}
+        styleDrawerOpen={styleDrawerOpen}
+        templatesCount={templates.length}
+        stickersCount={stickers.length}
+        page={page}
+        totalPages={totalPages}
+        dlOpen={dlOpen}
+        setDlOpen={setDlOpen}
+        onOpenStyles={() => setStyleDrawerOpen(true)}
+        onOpenTemplates={() => setTemplatesOpen(true)}
+        onOpenCsv={() => setCsvOpen(true)}
+        font={font}
+        setFont={setFont}
+        fonts={FONTS}
+        paperSize={paperSize}
+        setPaperSize={setPaperSize}
+        paperSizes={PAPER_SIZES}
+        onGenerateImage={generateImage}
+        onGeneratePDF={generatePDF}
+        pagesCount={pages.length}
+        icons={{
+          cardStack: <IcCardStack s={16} />,
+          layers: <IcLayers s={14} />,
+          upload: <IcUpload s={14} />,
+          chevDown: <IcChevDown s={16} />,
+          image: <IcImage s={18} />,
+          file: <IcFile s={18} />,
+        }}
+      />
 
-      <div style={{ padding: '20px 16px 100px', maxWidth: 840, margin: '0 auto' }}>
-
-        {/* ── Controls Panel ── */}
+      <div style={{
+        padding: '20px 16px 100px',
+        width: styleDrawerOpen ? `calc(100% - ${reservedDrawerSpace}px)` : '100%',
+        maxWidth: 980,
+        margin: styleDrawerOpen ? '0 auto 0 0' : '0 auto',
+        transition: 'width .2s cubic-bezier(.2,0,0,1), margin .2s cubic-bezier(.2,0,0,1)',
+      }}>
         <div style={{ background: '#fff', borderRadius: 20, padding: '18px 20px', marginBottom: 16, border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowMd }}>
-
-          {/* Row 1: Font (full width) */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Font</div>
-            <select className="ctrl-select" value={font} onChange={e => setFont(e.target.value)}
-              style={{ fontFamily: `'${font}', sans-serif`, width: '100%' }}>
-              {FONTS.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+          <div className="mobile-toolbar-controls" style={{ display: 'none', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginBottom: 14 }}>
+            <select className="ctrl-select" value={font} onChange={event => setFont(event.target.value)} style={{ fontFamily: `'${font}', sans-serif`, width: '100%' }}>
+              {FONTS.map(fontOption => <option key={fontOption.name} value={fontOption.name}>{fontOption.name}</option>)}
+            </select>
+            <select className="ctrl-select" value={paperSize} onChange={event => setPaperSize(event.target.value)}>
+              {PAPER_SIZES.map(size => <option key={size.id} value={size.id}>{size.label} - {size.desc}</option>)}
             </select>
           </div>
 
-          {/* Card Style dropdown */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Card Style</div>
-            {(() => {
-              const cs = CARD_STYLES.find(x => x.key === cardStyle) || CARD_STYLES[0];
-              return (
-                <button onClick={() => setStylePickerOpen(true)} style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 14px', borderRadius: 10,
-                  border: `1px solid ${M.outlineVar}`, background: '#fff',
-                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-                  transition: 'all .15s', boxShadow: M.shadowSm,
-                }}>
-                  <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{cs.icon}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: M.onSurface }}>{cs.name}</div>
-                    <div style={{ fontSize: 11, color: M.onSurfaceVar }}>{cs.desc}</div>
-                  </div>
-                  <IcChevDown s={16} />
-                </button>
-              );
-            })()}
-          </div>
-
-          {/* Row 2: Columns | Paper */}
-          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, marginBottom: 14 }}>
-
-            {/* Columns dropdown */}
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>Columns</div>
-              <select className="ctrl-select" value={gridCols} onChange={e => setGridCols(Number(e.target.value))}>
-                {GRID_OPTIONS.map(n => <option key={n} value={n}>{n} col</option>)}
-              </select>
-            </div>
-
-            {/* Paper dropdown */}
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
-                Paper <span style={{ color: M.error, fontSize: 9, fontWeight: 400, textTransform: 'none', marginLeft: 3 }}>PNG</span>
-              </div>
-              <select className="ctrl-select" value={paperSize} onChange={e => setPaperSize(e.target.value)}>
-                {PAPER_SIZES.map(s => <option key={s.id} value={s.id}>{s.label} — {s.desc}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Row 2: Paper info badge + Clear */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{
-              padding: '7px 12px', borderRadius: 10,
-              background: M.s2, border: `1px solid ${M.outlineVar}`,
-              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 12px',
+              borderRadius: 12,
+              background: M.s2,
+              border: `1px solid ${M.outlineVar}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
             }}>
-              <div style={{ width: Math.round(22 * (paper.w / paper.h)), height: 22, border: `1.5px solid ${M.primary}`, borderRadius: 2, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'center' }}>
-                  {[0, 1, 2].slice(0, gridCols === 3 ? 3 : 2).map((_, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 1.5 }}>
-                      {Array.from({ length: gridCols }).map((_, j) => (
-                        <div key={j} style={{ width: 2.5, height: 2.5, background: M.primary, borderRadius: 0.5, opacity: .6 }} />
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <div style={{ width: Math.round(24 * (paper.w / paper.h)), height: 24, border: `1.5px solid ${M.primary}`, borderRadius: 2, background: '#fff' }} />
               <div>
-                <div style={{ fontSize: 12, color: M.onSurface, fontWeight: 700 }}>{paper.label} · {paper.w}×{paper.h}px</div>
-                <div style={{ fontSize: 10, color: M.onSurfaceVar }}>200 DPI · {paper.desc}</div>
+                <div style={{ fontSize: 12, color: M.onSurface, fontWeight: 700 }}>{paper.label} | {paper.w}x{paper.h}px</div>
+                <div style={{ fontSize: 10, color: M.onSurfaceVar }}>{stickers.length} stickers | {pages.length} pages | fixed {BASE_GRID_COLS} columns</div>
               </div>
             </div>
-            <Btn variant={clearConfirm ? 'error' : 'outlined'} label={clearConfirm ? '⚠️ Confirm?' : '🗑️ Clear All'} onClick={clearAll} style={{ fontSize: 12, padding: '8px 16px' }} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ padding: '6px 10px', borderRadius: R.full, background: M.primaryContainer, color: M.primary, fontSize: 11, fontWeight: 700 }}>
+                New style: {getStyleMeta(selectedStyleKey).name}
+              </div>
+              <Btn variant={clearConfirm ? 'error' : 'outlined'} label={clearConfirm ? 'Confirm Clear' : 'Clear All'} onClick={clearAll} style={{ fontSize: 12, padding: '8px 16px' }} />
+            </div>
           </div>
         </div>
 
-        {/* ── Shelf ── */}
         <div
-          onDragOver={e  => { if (dragSrcType === 'grid') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragOverShelf(true); } }}
-          onDragEnter={e => { if (dragSrcType === 'grid') { e.preventDefault(); setDragOverShelf(true); } }}
-          onDragLeave={e => { const rc = e.currentTarget.getBoundingClientRect(); if (e.clientX < rc.left || e.clientX > rc.right || e.clientY < rc.top || e.clientY > rc.bottom) setDragOverShelf(false); }}
-          onDrop={handleDropOnShelf}
+          onDragOver={event => {
+            if (!dragState || dragState.type !== 'grid') return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+            setDragOverShelf(true);
+          }}
+          onDragEnter={event => {
+            if (!dragState || dragState.type !== 'grid') return;
+            event.preventDefault();
+            setDragOverShelf(true);
+          }}
+          onDragLeave={event => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
+              setDragOverShelf(false);
+            }
+          }}
+          onDrop={event => {
+            event.preventDefault();
+            handleDropOnShelf();
+          }}
           style={{
             background: dragOverShelf ? 'rgba(0,0,0,0.02)' : (savedCards.length > 0 ? '#fff' : 'transparent'),
-            border: dragOverShelf
-              ? `2px dashed ${M.primary}`
-              : (savedCards.length > 0 ? `1px solid ${M.outlineVar}` : `2px dashed rgba(0,0,0,0.12)`),
+            border: dragOverShelf ? `2px dashed ${M.primary}` : (savedCards.length > 0 ? `1px solid ${M.outlineVar}` : `2px dashed rgba(0,0,0,0.12)`),
             borderRadius: 20,
             padding: savedCards.length > 0 || dragOverShelf ? '14px 16px' : '12px 16px',
             marginBottom: 16,
-            boxShadow: dragOverShelf ? `0 0 0 4px rgba(0,0,0,0.05)` : (savedCards.length > 0 ? M.shadowMd : 'none'),
-            transition: 'all 0.18s',
-          }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: savedCards.length > 0 || dragOverShelf ? 12 : 0 }}>
+            boxShadow: dragOverShelf ? '0 0 0 4px rgba(0,0,0,0.05)' : (savedCards.length > 0 ? M.shadowMd : 'none'),
+            transition: 'all .18s',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: savedCards.length > 0 || dragOverShelf ? 12 : 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {savedCards.length > 0 && (
-                <div style={{ padding: '2px 10px', borderRadius: R.full, background: M.gradient, color: '#fff', fontSize: 11, fontWeight: 700 }}>⭐ {savedCards.length}</div>
+                <div style={{ padding: '2px 10px', borderRadius: R.full, background: M.gradient, color: '#fff', fontSize: 11, fontWeight: 700 }}>Shelf {savedCards.length}</div>
               )}
               <div style={{ fontSize: 12, fontWeight: 700, color: dragOverShelf ? M.primary : (savedCards.length > 0 ? M.onSurface : M.onSurfaceVar) }}>
-                {dragOverShelf ? 'Drop here to save to shelf'
-                  : savedCards.length > 0 ? 'Shelf — tap to add · drag to card'
-                  : 'Shelf empty — drag a card here or use ★'}
+                {dragOverShelf ? 'Drop a sticker here to save the full style + data + grid span'
+                  : savedCards.length > 0 ? 'Shelf stores mixed styles, mixed data, and mixed grid spans'
+                  : 'Shelf is empty. Save a sticker here or use the star button on any card.'}
               </div>
             </div>
-            {savedCards.length > 0 && !dragOverShelf && (
-              <button onClick={() => { setSavedCards([]); showToast('Shelf cleared'); }}
-                style={{ fontSize: 11, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '3px 8px', borderRadius: 6 }}>Clear</button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {savedCards.length > 0 && (
+                <button onClick={() => { setSavedCards([]); showToast('Shelf cleared'); }}
+                  style={{ fontSize: 11, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: '3px 8px', borderRadius: 6 }}>Clear</button>
+              )}
+              <button onClick={() => setShelfPickOpen(true)}
+                style={{ padding: '7px 12px', borderRadius: R.full, border: `1px solid ${M.outlineVar}`, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                Manage Shelf
+              </button>
+            </div>
           </div>
+
           {(savedCards.length > 0 || dragOverShelf) && (
             <div className="ss" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-              {savedCards.length === 0 && dragOverShelf && (
-                <div style={{ fontSize: 13, color: M.primary, fontWeight: 600, padding: '8px 0' }}>📋 Release to save</div>
-              )}
-              {savedCards.map(s => (
-                <ShelfCard key={s.savedId} s={s} font={font}
-                  onAdd={() => addSavedToGrid(s)}
-                  onRemove={() => removeSavedCard(s.savedId)}
-                  onDragStart={e => handleShelfDragStart(s, e)}
+              {savedCards.map(item => (
+                <ShelfCard
+                  key={item.id}
+                  s={{ savedId: item.id, ...item.sticker.data }}
+                  font={font}
+                  onAdd={() => addShelfItemToGrid(item)}
+                  onRemove={() => removeShelfItem(item.id)}
+                  onDragStart={event => handleShelfDragStart(item, event)}
                   onDragEnd={resetDrag}
-                  isDragging={dragSrcId === s.savedId && dragSrcType === 'shelf'}
-                  isDropTarget={false} />
+                  isDragging={dragState?.type === 'shelf' && dragState.itemId === item.id}
+                  isDropTarget={false}
+                />
               ))}
-              {dragOverShelf && savedCards.length > 0 && (
-                <div style={{ width: 86, flexShrink: 0, border: `2px dashed ${M.primary}`, borderRadius: R.md, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: M.primary }}>⭐</div>
-              )}
             </div>
           )}
         </div>
 
-        {/* Drag hint */}
         {isDragging && (
           <div style={{
-            textAlign: 'center', fontSize: 12, fontWeight: 600, marginBottom: 14,
-            padding: '10px 16px', borderRadius: 12,
+            textAlign: 'center',
+            fontSize: 12,
+            fontWeight: 600,
+            marginBottom: 14,
+            padding: '10px 16px',
+            borderRadius: 12,
             background: 'rgba(0,0,0,0.04)',
             color: M.onSurface,
             border: `1px solid ${M.outlineVar}`,
           }}>
-            {dragSrcType === 'shelf'
-              ? '⭐ Drop onto any slot — card goes to top of grid'
-              : '⠿ Drop onto a card to insert before it · empty slot to append · drag UP to shelf to save ⭐'}
+            {dragState?.type === 'style'
+              ? 'Drop the style sample into any grid cell to create a new sticker instance'
+              : dragState?.type === 'shelf'
+                ? 'Drop the shelf item into any grid cell to place that saved sticker'
+                : 'Drop onto a sticker to insert before it, onto an empty grid cell to append, or onto the shelf to save it'}
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 14 }}>
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-              style={{ padding: '7px 20px', borderRadius: R.full, border: `1.5px solid ${M.outlineVar}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: M.primary, opacity: page === 0 ? .35 : 1, fontFamily: 'inherit', boxShadow: M.shadowSm, transition: 'all .15s' }}>◀ Prev</button>
+            <button onClick={() => setPage(value => Math.max(0, value - 1))} disabled={page === 0}
+              style={{ padding: '7px 20px', borderRadius: R.full, border: `1.5px solid ${M.outlineVar}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: M.primary, opacity: page === 0 ? 0.35 : 1, fontFamily: 'inherit', boxShadow: M.shadowSm }}>
+              Prev
+            </button>
             <span style={{ fontSize: 13, color: M.onSurfaceVar, fontWeight: 600, minWidth: 100, textAlign: 'center' }}>Page {page + 1} / {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-              style={{ padding: '7px 20px', borderRadius: R.full, border: `1.5px solid ${M.outlineVar}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: M.primary, opacity: page >= totalPages - 1 ? .35 : 1, fontFamily: 'inherit', boxShadow: M.shadowSm, transition: 'all .15s' }}>Next ▶</button>
+            <button onClick={() => setPage(value => Math.min(totalPages - 1, value + 1))} disabled={page >= totalPages - 1}
+              style={{ padding: '7px 20px', borderRadius: R.full, border: `1.5px solid ${M.outlineVar}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: M.primary, opacity: page >= totalPages - 1 ? 0.35 : 1, fontFamily: 'inherit', boxShadow: M.shadowSm }}>
+              Next
+            </button>
           </div>
         )}
 
-        {/* ── Sticker Grid ── */}
         <div style={{ background: 'rgba(0,0,0,0.02)', borderRadius: 20, padding: '16px 14px', border: `1px solid ${M.outlineVar}`, boxShadow: M.shadowSm }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols},1fr)`, gap: 10 }}>
-            {pageProds.map(p => {
-              const fl = CARD_STYLES.find(x => x.key === cardStyle)?.layout ?? null;
-              if (cardStyle === 'classic') {
-                return <StickerCard key={p.id} p={p} font={font}
-                  onClick={() => { if (!isDragging) openEdit(p); }}
-                  onDelete={() => remove(p.id)}
-                  onSave={() => saveCardToShelf(p)}
-                  active={modal === p.id}
-                  {...cdp(p)} />;
+          <div style={{ width: '100%', aspectRatio: pagePreviewAspect, minHeight: 360, maxHeight: 760 }}>
+            {(() => {
+              const occupiedSet = new Set();
+              currentPlacements.forEach(({ row, col, span, rowSpan }) => {
+                for (let dr = 0; dr < (rowSpan || 1); dr++) {
+                  for (let dc = 0; dc < span; dc++) occupiedSet.add(`${row + dr},${col + dc}`);
+                }
+              });
+              const emptySlots = [];
+              for (let r = 0; r < pageRows; r++) {
+                for (let c = 0; c < BASE_GRID_COLS; c++) {
+                  if (!occupiedSet.has(`${r},${c}`)) emptySlots.push({ row: r, col: c });
+                }
               }
-              return <PriceTagCard key={p.id} p={p} font={font} forcedLayout={fl}
-                onClick={() => { if (!isDragging) openEdit(p); }}
-                onDelete={() => remove(p.id)}
-                onSave={() => saveCardToShelf(p)}
-                active={modal === p.id}
-                {...cdp(p)} />;
-            })}
-            {Array.from({ length: emptySlots }).map((_, i) => (
-              <div key={`e${i}`}
-                data-emptyslot="1"
-                onClick={() => { if (!isDragging) openEmptySlot(); }}
-                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
-                onDragEnter={e => { e.preventDefault(); setDragOverSlot(`e-${i}`); }}
-                onDragLeave={() => setDragOverSlot(s => s === `e-${i}` ? null : s)}
-                onDrop={handleDropOnEmpty}
-                className={dragOverSlot === `e-${i}` ? 'doe' : ''}
-                style={{
-                  border: `2px dashed rgba(0,0,0,0.14)`, borderRadius: 14, minHeight: 96,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  color: 'rgba(0,0,0,0.2)', fontSize: 22, cursor: 'pointer', transition: 'all .15s', gap: 4,
-                  background: 'transparent',
-                }}
-                onMouseEnter={e => { if (!isDragging) { e.currentTarget.style.borderColor = M.primary; e.currentTarget.style.color = M.primary; e.currentTarget.style.background = 'rgba(0,0,0,0.02)'; } }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.14)'; e.currentTarget.style.color = 'rgba(0,0,0,0.2)'; e.currentTarget.style.background = 'transparent'; }}>
-                {isDragging ? <span style={{ fontSize: 18 }}>📋</span> : <span style={{ fontSize: 24, fontWeight: 300 }}>+</span>}
-                {isDragging && <span style={{ fontSize: 9, fontWeight: 700, color: M.primary }}>drop here</span>}
-              </div>
-            ))}
+              return (
+                <div style={{ display: 'grid', height: '100%', gridTemplateColumns: `repeat(${BASE_GRID_COLS}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${pageRows}, minmax(0, 1fr))`, gap: 8 }}>
+                  {currentPlacements.map(({ sticker, row, col, span, rowSpan }) => renderGridSticker(sticker, row, col, span, rowSpan))}
+                  {(emptySlots.length > 0 ? emptySlots : [{ row: 0, col: 0 }]).map(({ row, col }) => {
+                    const key = `empty_${row}_${col}`;
+                    return (
+                      <div key={key}
+                        onClick={() => { if (!isDragging) openNewSticker(selectedStyleKey); }}
+                        onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }}
+                        onDragEnter={event => { event.preventDefault(); setDragOverId(key); }}
+                        onDragLeave={() => setDragOverId(current => (current === key ? null : current))}
+                        onDrop={event => { event.preventDefault(); handleDropAtPageEnd(); }}
+                        className={dragOverId === key ? 'doe' : ''}
+                        style={{
+                          gridColumn: `${col + 1}`, gridRow: `${row + 1}`,
+                          border: '2px dashed rgba(0,0,0,0.14)', borderRadius: 14, height: '100%',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          color: 'rgba(0,0,0,0.2)', fontSize: 22, cursor: 'pointer', transition: 'all .15s', gap: 4, background: 'transparent',
+                        }}>
+                        <span style={{ fontSize: isDragging ? 18 : 24, fontWeight: 300 }}>{isDragging ? 'Drop' : '+'}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: dragOverId === key ? M.primary : 'rgba(0,0,0,0.25)' }}>
+                          {isDragging ? 'add here' : 'new sticker'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
 
-      {/* ── FAB ── */}
       <div style={{ position: 'fixed', bottom: 28, right: 24, zIndex: 200 }}>
-        <button onClick={openAdd}
+        <button onClick={() => openNewSticker(selectedStyleKey)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
             padding: '15px 28px',
-            background: M.gradient, color: '#fff',
-            border: 'none', borderRadius: R.full,
-            fontSize: 15, fontWeight: 700, cursor: 'pointer',
-            boxShadow: '0 8px 28px rgba(99,102,241,0.42), 0 3px 10px rgba(99,102,241,0.25)',
-            fontFamily: `'${font}',sans-serif`,
-            transition: 'all .2s cubic-bezier(.2,0,0,1)',
-            letterSpacing: 0.2,
-          }}
-          onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 12px 40px rgba(99,102,241,0.52), 0 6px 16px rgba(99,102,241,0.32)'; e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)'; }}
-          onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(99,102,241,0.42), 0 3px 10px rgba(99,102,241,0.25)'; e.currentTarget.style.transform = 'none'; }}>
-          <span style={{ fontSize: 20, lineHeight: 1 }}>＋</span>
+            background: M.gradient,
+            color: '#fff',
+            border: 'none',
+            borderRadius: R.full,
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.22)',
+            fontFamily: `'${font}', sans-serif`,
+          }}>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>+</span>
           <span className="fab-label">Add Sticker</span>
         </button>
       </div>
 
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       <Snack msg={toast} />
+
       <CsvDialog open={csvOpen} onClose={() => setCsvOpen(false)} onImport={handleCsvImport} />
       <TemplatesDialog
         open={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         templates={templates}
         onSave={saveTemplate}
-        onLoad={loadTemplate}
+        onLoad={template => { loadTemplate(template); setTemplatesOpen(false); }}
         onDelete={deleteTemplate}
+        onExportCurrentJson={exportCurrentWorkspaceJson}
+        onImportJson={importTemplateJson}
         font={font}
       />
       <ShelfPickDialog
@@ -869,445 +1077,122 @@ export default function App() {
         onClose={() => setShelfPickOpen(false)}
         savedCards={savedCards}
         font={font}
-        onPickShelf={sc => { addSavedToGrid(sc); }}
-        onNewCreate={() => {
-          setForm({ ...EMPTY, theme: defaultStyle.theme, filled: defaultStyle.filled, ellipsis: defaultStyle.ellipsis, classic: cardStyle === 'classic' });
-          setAddToShelf(false); setModal('add');
-        }}
-        onRemoveShelf={removeSavedCard}
+        onPickShelf={item => { addShelfItemToGrid(item); setShelfPickOpen(false); }}
+        onNewCreate={() => openNewSticker(selectedStyleKey)}
+        onRemoveShelf={removeShelfItem}
+        onExportJson={exportShelfJson}
+        onImportJson={importShelfJson}
       />
 
-      {/* ── Card Style Picker (bottom sheet) ── */}
-      {stylePickerOpen && (
+      {styleDrawerOpen && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1500, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-          onClick={() => setStylePickerOpen(false)}>
+          style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: STYLE_DRAWER_WIDTH, zIndex: 1500, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none' }}
+        >
           <div
-            style={{ background: '#fff', borderRadius: '24px 24px 0 0', maxHeight: '88vh', overflowY: 'auto', paddingBottom: 32 }}
-            onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '20px 20px 14px' }}>
+            className="style-drawer"
+            onClick={event => event.stopPropagation()}
+            onDragOver={event => {
+              if (!dragState || dragState.type !== 'grid') return;
+              event.preventDefault();
+              setDragOverStyleDrawer(true);
+            }}
+            onDragLeave={() => setDragOverStyleDrawer(false)}
+            onDrop={event => {
+              event.preventDefault();
+              setDragOverStyleDrawer(false);
+              if (dragState?.type !== 'grid') return;
+              const source = stickers.find(sticker => sticker.id === dragState.stickerId);
+              if (!source) return;
+              setSelectedStyleKey(source.styleKey);
+              showToast(`Selected ${getStyleMeta(source.styleKey).name} as the active style`);
+              resetDrag();
+            }}
+            style={{ pointerEvents: 'auto', background: '#fff', width: '100%', height: '100vh', overflowY: 'auto', paddingBottom: 32, boxShadow: '-24px 0 60px rgba(0,0,0,0.12)', borderLeft: `1px solid ${M.outlineVar}` }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '22px 22px 16px', borderBottom: `1px solid ${M.outlineVar}`, position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: M.onSurface, letterSpacing: -0.3 }}>Card Style</div>
-                <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Choose how your price tags look</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: M.onSurface }}>Sticker Styles</div>
+                <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Drag a sample into the grid or click to create with that style</div>
               </div>
-              <button onClick={() => setStylePickerOpen(false)} style={{
-                width: 36, height: 36, borderRadius: '50%', border: 'none',
-                background: M.s3, color: M.onSurface, cursor: 'pointer', fontSize: 16,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>✕</button>
-            </div>
-
-            {/* 2-col style grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px' }}>
-              {CARD_STYLES.map(s => {
-                const selected = cardStyle === s.key;
-                return (
-                  <div key={s.key}
-                    onClick={() => { setCardStyle(s.key); setStylePickerOpen(false); }}
-                    style={{
-                      border: selected ? `2.5px solid ${M.primary}` : `1.5px solid ${M.outlineVar}`,
-                      borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
-                      background: selected ? 'rgba(99,102,241,0.04)' : '#fff',
-                      position: 'relative', transition: 'all .15s',
-                    }}>
-
-                    {/* Preview thumbnail */}
-                    <div style={{ height: 120, overflow: 'hidden', background: '#f5f7fa', position: 'relative' }}>
-                      <div style={{ transform: 'scale(0.48)', transformOrigin: 'top left', width: '208%', pointerEvents: 'none' }}>
-                        {s.key === 'classic'
-                          ? <StickerCard p={{ ...STYLE_PREV, classic: true }} font={font}
-                              onClick={() => {}} onDelete={() => {}} onSave={() => {}} active={false}
-                              isDragging={false} dragOverClass="" onDragStart={() => {}} onDragEnd={() => {}}
-                              onDragOver={() => {}} onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
-                          : <PriceTagCard p={STYLE_PREV} font={font} forcedLayout={s.layout}
-                              onClick={() => {}} onDelete={() => {}} onSave={() => {}} active={false}
-                              isDragging={false} dragOverClass="" onDragStart={() => {}} onDragEnd={() => {}}
-                              onDragOver={() => {}} onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
-                        }
-                      </div>
-                    </div>
-
-                    {/* Name & desc */}
-                    <div style={{ padding: '8px 10px 10px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: M.onSurface }}>{s.icon} {s.name}</div>
-                      <div style={{ fontSize: 10, color: M.onSurfaceVar, marginTop: 2 }}>{s.desc}</div>
-                    </div>
-
-                    {/* Selected checkmark */}
-                    {selected && (
-                      <div style={{
-                        position: 'absolute', bottom: 10, right: 10,
-                        width: 22, height: 22, borderRadius: '50%',
-                        background: M.primary, color: '#fff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 12, fontWeight: 900,
-                      }}>✓</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Edit / Add Modal ── */}
-      {modal !== null && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,12,50,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16, backdropFilter: 'blur(10px)' }}>
-          <div className="modal-card" style={{ background: '#fff', borderRadius: 24, padding: '28px 24px', width: '100%', maxWidth: 440, boxShadow: '0 32px 80px rgba(0,0,0,0.22), 0 8px 24px rgba(0,0,0,0.1)', maxHeight: '92vh', overflowY: 'auto', border: `1px solid ${M.outlineVar}` }}>
-
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: M.onSurface, letterSpacing: -0.4, lineHeight: 1.2 }}>
-                {modal === 'add' ? '✨ New Sticker' : '✏️ Edit Sticker'}
-              </div>
-              <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Fill in product details below</div>
-            </div>
-
-            {/* ── CLASSIC SIMPLE FIELDS ── */}
-            {form.classic ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-
-                <Field label="Product Name" value={form.name}
-                  onChange={e => setForm(v => ({ ...v, name: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. Samsung Galaxy A55 5G" />
-
-                {/* Storage / ROM + inline colour picker */}
-                <div>
-                  <Field label="Storage / ROM (GB)" value={form.rom}
-                    onChange={e => setForm(v => ({ ...v, rom: e.target.value }))}
-                    onKeyDown={e => e.key === 'Enter' && save()}
-                    placeholder="e.g. 256" />
-                  {form.rom && (
-                    <div style={{ marginTop: 5 }}>
-                      <span style={{
-                        display: 'inline-block', padding: '3px 10px', borderRadius: 20,
-                        fontSize: 11, fontWeight: 700,
-                        background: `${form.romColor || activeColor}18`,
-                        color: form.romColor || activeColor,
-                        border: `1px solid ${(form.romColor || activeColor)}40`,
-                      }}>Storage / ROM: {form.rom} GB</span>
-                    </div>
-                  )}
-                  <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: M.s2, border: `1px solid ${M.outlineVar}` }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>Storage / ROM Color</div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div onClick={() => setForm(f => ({ ...f, romColor: '' }))} title="Auto"
-                        style={{
-                          width: 28, height: 28, borderRadius: '50%', background: '#fff', cursor: 'pointer',
-                          border: !form.romColor ? `3px solid ${activeColor}` : `2px solid ${activeColor}35`,
-                          boxShadow: !form.romColor ? `0 0 0 2px ${activeColor}50` : '0 1px 4px rgba(0,0,0,0.12)',
-                          transform: !form.romColor ? 'scale(1.2)' : 'scale(1)', transition: 'all .15s',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 7, fontWeight: 900, color: activeColor,
-                        }}>AUTO</div>
-                      {THEMES.map((t, i) => (
-                        <div key={i} onClick={() => setForm(f => ({ ...f, romColor: t.color }))} title={t.label}
-                          style={{
-                            width: 28, height: 28, borderRadius: '50%', background: t.color, cursor: 'pointer',
-                            border: form.romColor === t.color ? '3px solid #fff' : '2px solid transparent',
-                            boxShadow: form.romColor === t.color ? `0 0 0 2px ${t.color}, 0 3px 8px ${t.color}55` : '0 1px 4px rgba(0,0,0,0.15)',
-                            transform: form.romColor === t.color ? 'scale(1.2)' : 'scale(1)',
-                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
-                          }} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Battery + inline colour picker */}
-                <div>
-                  <Field label="Battery (mAh)" value={form.battery}
-                    onChange={e => setForm(v => ({ ...v, battery: e.target.value }))}
-                    onKeyDown={e => e.key === 'Enter' && save()}
-                    placeholder="e.g. 5000" />
-                  <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: M.s2, border: `1px solid ${M.outlineVar}` }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>Battery Color</div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div onClick={() => setForm(f => ({ ...f, batteryColor: '' }))} title="Auto"
-                        style={{
-                          width: 28, height: 28, borderRadius: '50%', background: '#fff', cursor: 'pointer',
-                          border: !form.batteryColor ? `3px solid ${activeColor}` : `2px solid ${activeColor}35`,
-                          boxShadow: !form.batteryColor ? `0 0 0 2px ${activeColor}50` : '0 1px 4px rgba(0,0,0,0.12)',
-                          transform: !form.batteryColor ? 'scale(1.2)' : 'scale(1)', transition: 'all .15s',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 7, fontWeight: 900, color: activeColor,
-                        }}>AUTO</div>
-                      {THEMES.map((t, i) => (
-                        <div key={i} onClick={() => setForm(f => ({ ...f, batteryColor: t.color }))} title={t.label}
-                          style={{
-                            width: 28, height: 28, borderRadius: '50%', background: t.color, cursor: 'pointer',
-                            border: form.batteryColor === t.color ? '3px solid #fff' : '2px solid transparent',
-                            boxShadow: form.batteryColor === t.color ? `0 0 0 2px ${t.color}, 0 3px 8px ${t.color}55` : '0 1px 4px rgba(0,0,0,0.15)',
-                            transform: form.batteryColor === t.color ? 'scale(1.2)' : 'scale(1)',
-                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
-                          }} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <Field label="Price (THB)" value={form.price}
-                  onChange={e => setForm(v => ({ ...v, price: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && save()}
-                  placeholder="e.g. 9990" />
-
-              </div>
-
-            ) : (
-              /* ── PREMIUM DYNAMIC FIELDS (original form) ── */
-              <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                  {[
-                    { label: 'Product Name',       key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
-                    { label: 'RAM (GB)',            key: 'ram',     ph: 'e.g. 8 or 8+8',  tag: v => `RAM: ${v} GB` },
-                    { label: 'Storage / ROM (GB)', key: 'rom',     ph: 'e.g. 256',        tag: v => `ROM: ${v} GB` },
-                    { label: 'Battery (mAh)',       key: 'battery', ph: 'e.g. 5000' },
-                    { label: 'Price (THB)',         key: 'price',   ph: 'e.g. 9990' },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <Field label={f.label} value={form[f.key]}
-                        onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))}
-                        onKeyDown={e => e.key === 'Enter' && save()}
-                        placeholder={f.ph} />
-                      {f.tag && form[f.key] && (
-                        <div style={{ marginTop: 5 }}>
-                          <span style={{
-                            display: 'inline-block', padding: '3px 10px', borderRadius: 20,
-                            fontSize: 11, fontWeight: 700,
-                            background: `${activeColor}18`, color: activeColor,
-                            border: `1px solid ${activeColor}40`,
-                          }}>{f.tag(form[f.key])}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Phone Details */}
-                <div style={{ borderTop: `1px solid ${M.outlineVar}`, paddingTop: 12, marginBottom: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Phone Details</div>
-
-                  <div style={{ marginBottom: 10 }}>
-                    <Field label="Brand" value={form.brand || ''}
-                      onChange={e => setForm(v => ({ ...v, brand: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && save()}
-                      placeholder="e.g. Samsung" />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                    <Field label="Camera (MP)" value={form.camera || ''}
-                      onChange={e => setForm(v => ({ ...v, camera: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && save()}
-                      placeholder="e.g. 50" />
-                    <Field label="Chip" value={form.chip || ''}
-                      onChange={e => setForm(v => ({ ...v, chip: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && save()}
-                      placeholder='e.g. SD 8 Gen 3' />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                    <Field label='Display (")' value={form.display || ''}
-                      onChange={e => setForm(v => ({ ...v, display: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && save()}
-                      placeholder="e.g. 6.7" />
-                    <Field label="Original Price" value={form.oldPrice || ''}
-                      onChange={e => setForm(v => ({ ...v, oldPrice: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && save()}
-                      placeholder="e.g. 9990" />
-                  </div>
-
-                  <div style={{
-                    marginBottom: 10, padding: '10px 14px', borderRadius: 12,
-                    background: form.has5g ? 'rgba(26,115,232,0.06)' : M.s2,
-                    border: `1px solid ${form.has5g ? 'rgba(26,115,232,0.2)' : 'rgba(0,0,0,0.06)'}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>5G Connectivity</div>
-                    <Switch value={!!form.has5g} onChange={v => setForm(f => ({ ...f, has5g: v }))} />
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
-                      Featured Spec (forces Camera Pro layout)
-                    </div>
-                    <select className="ctrl-select"
-                      value={form.featuredSpec || ''}
-                      onChange={e => setForm(v => ({ ...v, featuredSpec: e.target.value }))}>
-                      <option value="">Auto-detect</option>
-                      <option value="camera">📸 Camera</option>
-                      <option value="battery">🔋 Battery</option>
-                    </select>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Sticker Color – always shown */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {THEMES.map((t, i) => (
-                  <div key={i} onClick={() => setForm(v => ({ ...v, theme: i }))} title={t.label} style={{
-                    width: 36, height: 36, borderRadius: '50%', background: t.color, cursor: 'pointer',
-                    border: form.theme === i ? '3px solid #fff' : '3px solid transparent',
-                    boxShadow: form.theme === i ? `0 0 0 3px ${t.color}, 0 4px 12px ${t.color}60` : '0 2px 6px rgba(0,0,0,0.15)',
-                    transform: form.theme === i ? 'scale(1.18)' : 'scale(1)',
-                    transition: 'all .15s cubic-bezier(.2,0,0,1)',
-                  }} />
-                ))}
-              </div>
-            </div>
-
-            {/* Style toggle – always shown */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Style</div>
-              <StyleToggle value={form.filled} onChange={v => setForm(f => ({ ...f, filled: v }))} color={activeColor} />
-            </div>
-
-            {/* Set as default – Premium Dynamic only */}
-            {!form.classic && (
-              <div style={{
-                marginBottom: 14, padding: '10px 14px', borderRadius: 12,
-                background: isCurrentDefault ? `rgba(99,102,241,0.06)` : M.s2,
-                border: `1px solid ${isCurrentDefault ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                transition: 'all .2s',
-              }}>
-                <div style={{ fontSize: 12, color: isCurrentDefault ? M.primary : M.onSurfaceVar, fontWeight: isCurrentDefault ? 600 : 400 }}>
-                  {isCurrentDefault ? '✓ This is your default card style' : 'Save color & style as default for new cards'}
-                </div>
-                {!isCurrentDefault && (
-                  <button onClick={applyDefaultStyle} style={{
-                    padding: '5px 13px', borderRadius: R.full, flexShrink: 0,
-                    background: M.s3, color: M.onSurfaceVar,
-                    border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                  }}>Set Default</button>
-                )}
-              </div>
-            )}
-
-            {/* One-line name */}
-            <div style={{
-              marginBottom: 14, padding: '12px 14px', borderRadius: 12,
-              background: form.ellipsis ? `rgba(99,102,241,0.06)` : M.s2,
-              border: `1px solid ${form.ellipsis ? M.outlineVar : 'rgba(0,0,0,0.06)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              transition: 'all .2s',
-            }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface, lineHeight: 1.3 }}>
-                  One-line name
-                  <span style={{
-                    marginLeft: 8, fontSize: 10, fontWeight: 700,
-                    padding: '2px 7px', borderRadius: R.full,
-                    background: form.ellipsis ? M.primary : M.s4,
-                    color: form.ellipsis ? '#fff' : M.onSurfaceVar,
-                    transition: 'all .2s',
-                  }}>{form.ellipsis ? 'ON' : 'OFF'}</span>
-                </div>
-                <div style={{ fontSize: 11, color: M.onSurfaceVar, marginTop: 2 }}>
-                  {form.ellipsis ? 'Long names truncated with …' : 'Names wrap to multiple lines'}
-                </div>
-              </div>
-              <Switch value={form.ellipsis} onChange={v => setForm(f => ({ ...f, ellipsis: v }))} />
-            </div>
-
-            {/* Save to shelf */}
-            <div style={{
-              marginBottom: 16, padding: '12px 14px', borderRadius: 12,
-              background: addToShelf ? `rgba(139,92,246,0.06)` : M.s2,
-              border: `1px solid ${addToShelf ? 'rgba(139,92,246,0.2)' : 'rgba(0,0,0,0.06)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              transition: 'all .2s',
-            }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: M.onSurface }}>Save to shelf ⭐</div>
-                {addToShelf && <div style={{ fontSize: 11, color: M.onSurfaceVar, marginTop: 2 }}>Card saved for quick reuse</div>}
-              </div>
-              <Switch value={addToShelf} onChange={setAddToShelf} />
-            </div>
-
-            {/* Live preview */}
-            {form.name && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Preview</div>
-                <div style={{ maxWidth: 148 }}>
-                  {form.classic
-                    ? <StickerCard p={{ ...form, id: 0 }} font={font}
-                        onClick={() => {}} onDelete={() => {}} onSave={() => {}}
-                        active={false} isDragging={false} dragOverClass=""
-                        onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
-                        onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
-                    : <PriceTagCard p={{ ...form, id: 0 }} font={font}
-                        onClick={() => {}} onDelete={() => {}} onSave={() => {}}
-                        active={false} isDragging={false} dragOverClass=""
-                        onDragStart={() => {}} onDragEnd={() => {}} onDragOver={() => {}}
-                        onDragEnter={() => {}} onDragLeave={() => {}} onDrop={() => {}} />
-                  }
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setModal(null)} style={{
-                flex: 1, padding: '12px 0', borderRadius: R.full,
-                border: `1.5px solid ${M.outlineVar}`, background: '#fff',
-                color: M.primary, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                fontFamily: 'inherit', transition: 'all .15s',
-              }}>Cancel</button>
-              <button onClick={save} disabled={!canSave} style={{
-                flex: 2, padding: '12px 0', borderRadius: R.full, border: 'none',
-                background: canSave ? M.gradient : M.s3,
-                color: canSave ? '#fff' : M.onSurfaceVar,
-                fontSize: 14, fontWeight: 700,
-                cursor: canSave ? 'pointer' : 'not-allowed',
-                boxShadow: canSave ? '0 4px 14px rgba(99,102,241,0.4)' : 'none',
-                fontFamily: 'inherit', transition: 'all .15s',
-              }}>
-                {modal === 'add'
-                  ? (addToShelf ? 'Add to Grid & Shelf ⭐' : 'Add Sticker')
-                  : (addToShelf ? 'Save & Add to Shelf ⭐' : 'Save Changes')}
+              <button onClick={() => setStyleDrawerOpen(false)}
+                style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: M.s3, color: M.onSurface, cursor: 'pointer', fontSize: 16 }}>
+                x
               </button>
             </div>
+
+            <div style={{ padding: '14px 18px 0' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 14,
+                background: dragOverStyleDrawer ? 'rgba(0,0,0,0.04)' : M.s2,
+                border: `1px solid ${dragOverStyleDrawer ? M.primary : M.outlineVar}`,
+                marginBottom: 14,
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: M.onSurface }}>Active create style</div>
+                <div style={{ padding: '4px 10px', borderRadius: R.full, background: '#fff', border: `1px solid ${M.outlineVar}`, fontSize: 11, fontWeight: 700 }}>
+                  {getStyleMeta(selectedStyleKey).name}
+                </div>
+                <div style={{ fontSize: 11, color: M.onSurfaceVar }}>Page grid: fixed {BASE_GRID_COLS} columns</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 18px' }}>
+              {STYLE_CATALOG.map(style => (
+                <StyleSample
+                  key={style.key}
+                  styleKey={style.key}
+                  font={font}
+                  onCreate={() => {
+                    setSelectedStyleKey(style.key);
+                    openNewSticker(style.key);
+                  }}
+                  onDragStart={event => handleStyleDragStart(style.key, event)}
+                  onDragEnd={resetDrag}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Mobile Image Preview Modal ── */}
+      <StickerEditorModal
+        open={editorOpen}
+        editingId={editingId}
+        formStyleKey={formStyleKey}
+        setFormStyleKey={setFormStyleKey}
+        formGridCols={formGridCols}
+        setFormGridCols={setFormGridCols}
+        formGridRows={formGridRows}
+        setFormGridRows={setFormGridRows}
+        formData={formData}
+        setFormData={setFormData}
+        addToShelf={addToShelf}
+        setAddToShelf={setAddToShelf}
+        font={font}
+        canSave={canSave}
+        onClose={closeEditor}
+        onSave={saveEditor}
+        previewCardProps={PREVIEW_CARD_PROPS}
+      />
+
       {previewImg && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 2000,
-          background: 'rgba(0,0,0,0.92)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{ width: '100%', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.6)', flexShrink: 0 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '100%', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.6)' }}>
             <div>
-              <div style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>🖼️ {previewImg.label} · Page {previewImg.page}</div>
-              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 2 }}>📱 Long-press the image → "Save to Photos"</div>
+              <div style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>{previewImg.label} | Page {previewImg.page}</div>
+              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 2 }}>Long-press the image to save it on mobile.</div>
             </div>
-            <button onClick={() => setPreviewImg(null)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            <button onClick={() => setPreviewImg(null)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 18, cursor: 'pointer' }}>x</button>
           </div>
-
           <div style={{ flex: 1, overflowY: 'auto', width: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '12px 0' }}>
-            <img src={previewImg.src} alt="Price tags" style={{ width: '100%', maxWidth: 640, height: 'auto', display: 'block', userSelect: 'none' }} />
-          </div>
-
-          <div style={{ width: '100%', padding: '14px 18px 28px', background: 'rgba(0,0,0,0.6)', flexShrink: 0, display: 'flex', gap: 10 }}>
-            <a href={previewImg.src}
-              download={`stickers-${previewImg.label.toLowerCase()}-p${previewImg.page}.png`}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 0', borderRadius: R.xl, background: M.primary, color: '#fff', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
-              ⬇️ Download (desktop)
-            </a>
-            <button onClick={() => setPreviewImg(null)}
-              style={{ flex: 1, padding: '13px 0', borderRadius: R.xl, border: '1.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Close
-            </button>
+            <img src={previewImg.src} alt="Sticker page" style={{ width: '100%', maxWidth: 640, height: 'auto', display: 'block' }} />
           </div>
         </div>
       )}
     </div>
   );
 }
+

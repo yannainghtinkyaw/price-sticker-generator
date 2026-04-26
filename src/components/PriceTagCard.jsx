@@ -53,6 +53,7 @@ export default function PriceTagCard({
         position:   'relative',
         cursor:     'grab',
         userSelect: 'none',
+        height:     '100%',
         fontFamily: `'${font}', sans-serif`,
         outline:    active ? '2.5px solid rgba(99,102,241,0.6)' : 'none',
         outlineOffset: 3,
