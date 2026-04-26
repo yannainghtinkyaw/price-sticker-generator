@@ -832,41 +832,152 @@ export default function App() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,12,50,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16, backdropFilter: 'blur(10px)' }}>
           <div className="modal-card" style={{ background: '#fff', borderRadius: 24, padding: '28px 24px', width: '100%', maxWidth: 440, boxShadow: '0 32px 80px rgba(0,0,0,0.22), 0 8px 24px rgba(0,0,0,0.1)', maxHeight: '92vh', overflowY: 'auto', border: `1px solid ${M.outlineVar}` }}>
 
-            <div style={{ marginBottom: 22 }}>
+            <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: M.onSurface, letterSpacing: -0.4, lineHeight: 1.2 }}>
                 {modal === 'add' ? '✨ New Sticker' : '✏️ Edit Sticker'}
               </div>
               <div style={{ fontSize: 13, color: M.onSurfaceVar, marginTop: 3 }}>Fill in product details below</div>
             </div>
 
-            {/* Fields */}
+            {/* ── Card Layout — top of form ── */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>Card Layout</div>
+              <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${M.outlineVar}` }}>
+                {[
+                  { key: false, label: '✨ Premium Dynamic' },
+                  { key: true,  label: '🏷️ Classic Simple'  },
+                ].map(({ key, label }) => (
+                  <button key={String(key)}
+                    onClick={() => setForm(f => ({ ...f, classic: key }))}
+                    style={{
+                      flex: 1, padding: '10px 6px', border: 'none',
+                      background: form.classic === key ? M.gradient : '#fff',
+                      color:      form.classic === key ? '#fff' : M.onSurfaceVar,
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      fontFamily: 'inherit', transition: 'all .15s',
+                    }}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Fields ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-              {[
-                { label: 'Product Name',       key: 'name',    ph: 'e.g. Samsung Galaxy A55 5G' },
-                { label: 'RAM (GB)',            key: 'ram',     ph: 'e.g. 8 or 8+8',  tag: v => `RAM: ${v} GB` },
-                { label: 'Storage / ROM (GB)', key: 'rom',     ph: 'e.g. 256',        tag: v => `ROM: ${v} GB` },
-                { label: 'Battery (mAh)',       key: 'battery', ph: 'e.g. 5000' },
-                { label: 'Price (THB)',         key: 'price',   ph: 'e.g. 9990' },
-              ].map(f => (
-                <div key={f.key}>
-                  <Field label={f.label} value={form[f.key]}
-                    onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))}
-                    onKeyDown={e => e.key === 'Enter' && save()}
-                    placeholder={f.ph} />
-                  {f.tag && form[f.key] && (
-                    <div style={{ marginTop: 5 }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '3px 10px', borderRadius: 20,
-                        fontSize: 11, fontWeight: 700,
-                        background: `${THEMES[form.theme].color}18`,
-                        color: THEMES[form.theme].color,
-                        border: `1px solid ${THEMES[form.theme].color}40`,
-                      }}>{f.tag(form[f.key])}</span>
+
+              {/* Product Name */}
+              <div>
+                <Field label="Product Name" value={form.name}
+                  onChange={e => setForm(v => ({ ...v, name: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. Samsung Galaxy A55 5G" />
+              </div>
+
+              {/* RAM */}
+              <div>
+                <Field label="RAM (GB)" value={form.ram}
+                  onChange={e => setForm(v => ({ ...v, ram: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. 8 or 8+8" />
+                {form.ram && (
+                  <div style={{ marginTop: 5 }}>
+                    <span style={{
+                      display: 'inline-block', padding: '3px 10px', borderRadius: 20,
+                      fontSize: 11, fontWeight: 700,
+                      background: `${activeColor}18`, color: activeColor,
+                      border: `1px solid ${activeColor}40`,
+                    }}>RAM: {form.ram} GB</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Storage / ROM — inline colour picker when Classic */}
+              <div>
+                <Field label="Storage / ROM (GB)" value={form.rom}
+                  onChange={e => setForm(v => ({ ...v, rom: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. 256" />
+                {form.rom && (
+                  <div style={{ marginTop: 5 }}>
+                    <span style={{
+                      display: 'inline-block', padding: '3px 10px', borderRadius: 20,
+                      fontSize: 11, fontWeight: 700,
+                      background: `${form.romColor || activeColor}18`,
+                      color: form.romColor || activeColor,
+                      border: `1px solid ${(form.romColor || activeColor)}40`,
+                    }}>ROM: {form.rom} GB</span>
+                  </div>
+                )}
+                {form.classic && (
+                  <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: M.s2, border: `1px solid ${M.outlineVar}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>Storage / ROM Color</div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div onClick={() => setForm(f => ({ ...f, romColor: '' }))} title="Auto (matches sticker color)"
+                        style={{
+                          width: 28, height: 28, borderRadius: '50%', background: '#fff', cursor: 'pointer',
+                          border: !form.romColor ? `3px solid ${activeColor}` : `2px solid ${activeColor}35`,
+                          boxShadow: !form.romColor ? `0 0 0 2px ${activeColor}50` : '0 1px 4px rgba(0,0,0,0.12)',
+                          transform: !form.romColor ? 'scale(1.2)' : 'scale(1)',
+                          transition: 'all .15s',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 7, fontWeight: 900, color: activeColor,
+                        }}>AUTO</div>
+                      {THEMES.map((t, i) => (
+                        <div key={i} onClick={() => setForm(f => ({ ...f, romColor: t.color }))} title={t.label}
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%', background: t.color, cursor: 'pointer',
+                            border: form.romColor === t.color ? '3px solid #fff' : '2px solid transparent',
+                            boxShadow: form.romColor === t.color ? `0 0 0 2px ${t.color}, 0 3px 8px ${t.color}55` : '0 1px 4px rgba(0,0,0,0.15)',
+                            transform: form.romColor === t.color ? 'scale(1.2)' : 'scale(1)',
+                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
+                          }} />
+                      ))}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Battery — inline colour picker when Classic */}
+              <div>
+                <Field label="Battery (mAh)" value={form.battery}
+                  onChange={e => setForm(v => ({ ...v, battery: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. 5000" />
+                {form.classic && (
+                  <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: M.s2, border: `1px solid ${M.outlineVar}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>Battery Color</div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div onClick={() => setForm(f => ({ ...f, batteryColor: '' }))} title="Auto (matches sticker color)"
+                        style={{
+                          width: 28, height: 28, borderRadius: '50%', background: '#fff', cursor: 'pointer',
+                          border: !form.batteryColor ? `3px solid ${activeColor}` : `2px solid ${activeColor}35`,
+                          boxShadow: !form.batteryColor ? `0 0 0 2px ${activeColor}50` : '0 1px 4px rgba(0,0,0,0.12)',
+                          transform: !form.batteryColor ? 'scale(1.2)' : 'scale(1)',
+                          transition: 'all .15s',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 7, fontWeight: 900, color: activeColor,
+                        }}>AUTO</div>
+                      {THEMES.map((t, i) => (
+                        <div key={i} onClick={() => setForm(f => ({ ...f, batteryColor: t.color }))} title={t.label}
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%', background: t.color, cursor: 'pointer',
+                            border: form.batteryColor === t.color ? '3px solid #fff' : '2px solid transparent',
+                            boxShadow: form.batteryColor === t.color ? `0 0 0 2px ${t.color}, 0 3px 8px ${t.color}55` : '0 1px 4px rgba(0,0,0,0.15)',
+                            transform: form.batteryColor === t.color ? 'scale(1.2)' : 'scale(1)',
+                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
+                          }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Price */}
+              <div>
+                <Field label="Price (THB)" value={form.price}
+                  onChange={e => setForm(v => ({ ...v, price: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="e.g. 9990" />
+              </div>
+
             </div>
 
             {/* ── Phone Details (premium layout fields) ── */}
@@ -937,27 +1048,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* ── Card Layout toggle ── */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 }}>Card Layout</div>
-              <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${M.outlineVar}` }}>
-                {[
-                  { key: false, label: '✨ Premium Dynamic' },
-                  { key: true,  label: '🏷️ Classic Simple'  },
-                ].map(({ key, label }) => (
-                  <button key={String(key)}
-                    onClick={() => setForm(f => ({ ...f, classic: key }))}
-                    style={{
-                      flex: 1, padding: '9px 6px', border: 'none',
-                      background: form.classic === key ? M.gradient : '#fff',
-                      color:      form.classic === key ? '#fff' : M.onSurfaceVar,
-                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                      fontFamily: 'inherit', transition: 'all .15s',
-                    }}>{label}</button>
-                ))}
-              </div>
-            </div>
-
             {/* Colour picker */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Color</div>
@@ -973,51 +1063,6 @@ export default function App() {
                 ))}
               </div>
             </div>
-
-            {/* ── Field Colors (Classic Simple only) ── */}
-            {form.classic && (
-              <div style={{ marginBottom: 18, padding: '14px 14px', borderRadius: 14, background: `${activeColor}08`, border: `1px solid ${activeColor}25` }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 }}>Field Colors</div>
-                {[
-                  { label: 'Storage / ROM', key: 'romColor' },
-                  { label: 'Battery',       key: 'batteryColor' },
-                ].map(({ label, key }) => (
-                  <div key={key} style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: M.onSurface, marginBottom: 7 }}>{label}</div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {/* Auto swatch – uses the main sticker colour */}
-                      <div
-                        onClick={() => setForm(f => ({ ...f, [key]: '' }))}
-                        title="Auto (matches sticker color)"
-                        style={{
-                          width: 32, height: 32, borderRadius: '50%',
-                          background: '#fff',
-                          border: !form[key] ? `3px solid ${activeColor}` : `2px solid ${activeColor}40`,
-                          boxShadow: !form[key] ? `0 0 0 2px ${activeColor}55` : '0 2px 6px rgba(0,0,0,0.1)',
-                          transform: !form[key] ? 'scale(1.18)' : 'scale(1)',
-                          transition: 'all .15s',
-                          cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 8, fontWeight: 900, color: activeColor, letterSpacing: 0,
-                        }}>AUTO</div>
-                      {/* 7 theme colour swatches */}
-                      {THEMES.map((t, i) => (
-                        <div key={i}
-                          onClick={() => setForm(f => ({ ...f, [key]: t.color }))}
-                          title={t.label}
-                          style={{
-                            width: 32, height: 32, borderRadius: '50%', background: t.color, cursor: 'pointer',
-                            border: form[key] === t.color ? '3px solid #fff' : '3px solid transparent',
-                            boxShadow: form[key] === t.color ? `0 0 0 3px ${t.color}, 0 4px 12px ${t.color}60` : '0 2px 6px rgba(0,0,0,0.15)',
-                            transform: form[key] === t.color ? 'scale(1.18)' : 'scale(1)',
-                            transition: 'all .15s cubic-bezier(.2,0,0,1)',
-                          }} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {/* Style toggle */}
             <div style={{ marginBottom: 14 }}>
