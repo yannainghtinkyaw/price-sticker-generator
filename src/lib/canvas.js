@@ -51,10 +51,14 @@ export function drawSticker(ctx, p, x, y, w, h, font) {
   }
   ctx.fillText(p.name, x + w / 2, y + h * 0.19);
 
-  // Specs
-  ctx.font = `400 21px ${f}`;
-  ctx.fillText(`Ram ${p.ram} / Rom ${p.rom} GB`, x + w / 2, y + h * 0.37);
-  ctx.fillText(`Battery : ${p.battery} mAh`,      x + w / 2, y + h * 0.51);
+  // Specs – bold for Classic cards; per-field custom colours
+  const specWeight = p.classic ? '800' : '400';
+  ctx.font = `${specWeight} 21px ${f}`;
+  ctx.fillStyle = p.romColor || fg;
+  ctx.fillText(`Storage / ROM ${p.rom} GB`,   x + w / 2, y + h * 0.37);
+  ctx.fillStyle = p.batteryColor || fg;
+  ctx.fillText(`${p.battery} mAh`,             x + w / 2, y + h * 0.51);
+  ctx.fillStyle = fg;
 
   // Price badge
   const bw = w * 0.72, bh = h * 0.24;
