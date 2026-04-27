@@ -331,27 +331,37 @@ function StyleSample({ styleKey, font, onCreate, onDragStart, onDragEnd }) {
     </div>
   );
 }
+let _ws = null;
+function getPersistedWorkspace() {
+  if (_ws) return _ws;
+  const raw = lsGet(LS_WORKSPACE);
+  if (raw) { try { _ws = hydrateWorkspaceSnapshot(JSON.parse(raw)); return _ws; } catch {} }
+  _ws = hydrateWorkspaceSnapshot({ stickers: createInitialStickers(), font: 'Kanit', paperSize: 'a4', defaultGridCols: 1, selectedStyleKey: 'classic' });
+  return _ws;
+}
+
+function loadPersistedShelf() {
+  const raw = lsGet(LS_SHELF);
+  if (raw) { try { return hydrateShelfItems(JSON.parse(raw)); } catch {} }
+  return [];
+}
+
+function loadPersistedTemplates() {
+  const raw = lsGet(LS_TEMPLATES);
+  if (raw) { try { return JSON.parse(raw); } catch {} }
+  return [];
+}
+
 export default function App() {
   const STYLE_DRAWER_WIDTH = 460;
-  const initialWorkspace = hydrateWorkspaceSnapshot({
-    stickers: createInitialStickers(),
-    font: "Kanit",
-    paperSize: "a4",
-    defaultGridCols: 1,
-    selectedStyleKey: "classic",
-  });
 
-  const [stickers, setStickers] = useState(initialWorkspace.stickers);
-  const [font, setFont] = useState(initialWorkspace.font);
-  const [paperSize, setPaperSize] = useState(initialWorkspace.paperSize);
-  const [defaultGridCols, setDefaultGridCols] = useState(
-    initialWorkspace.defaultGridCols,
-  );
-  const [selectedStyleKey, setSelectedStyleKey] = useState(
-    initialWorkspace.selectedStyleKey,
-  );
-  const [savedCards, setSavedCards] = useState([]);
-  const [templates, setTemplates] = useState([]);
+  const [stickers, setStickers] = useState(() => getPersistedWorkspace().stickers);
+  const [font, setFont] = useState(() => getPersistedWorkspace().font);
+  const [paperSize, setPaperSize] = useState(() => getPersistedWorkspace().paperSize);
+  const [defaultGridCols, setDefaultGridCols] = useState(() => getPersistedWorkspace().defaultGridCols);
+  const [selectedStyleKey, setSelectedStyleKey] = useState(() => getPersistedWorkspace().selectedStyleKey);
+  const [savedCards, setSavedCards] = useState(loadPersistedShelf);
+  const [templates, setTemplates] = useState(loadPersistedTemplates);
   const [csvOpen, setCsvOpen] = useState(false);
   const [shelfPickOpen, setShelfPickOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -374,9 +384,6 @@ export default function App() {
   const [dragOverStyleDrawer, setDragOverStyleDrawer] = useState(false);
 
   const canvasRef = useRef(null);
-  const workspaceLoadedRef = useRef(false);
-  const shelfLoadedRef = useRef(false);
-  const templatesLoadedRef = useRef(false);
 
   const paper =
     PAPER_SIZES.find((size) => size.id === paperSize) || PAPER_SIZES[1];
@@ -395,42 +402,6 @@ export default function App() {
   const isDragging = !!dragState;
 
   useEffect(() => {
-    const workspaceRaw = lsGet(LS_WORKSPACE);
-    if (workspaceRaw) {
-      try {
-        const workspace = hydrateWorkspaceSnapshot(JSON.parse(workspaceRaw));
-        setStickers(workspace.stickers);
-        setFont(workspace.font);
-        setPaperSize(workspace.paperSize);
-        setDefaultGridCols(workspace.defaultGridCols);
-        setSelectedStyleKey(workspace.selectedStyleKey);
-      } catch {}
-    }
-    workspaceLoadedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    const shelfRaw = lsGet(LS_SHELF);
-    if (shelfRaw) {
-      try {
-        setSavedCards(hydrateShelfItems(JSON.parse(shelfRaw)));
-      } catch {}
-    }
-    shelfLoadedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    const templatesRaw = lsGet(LS_TEMPLATES);
-    if (templatesRaw) {
-      try {
-        setTemplates(JSON.parse(templatesRaw));
-      } catch {}
-    }
-    templatesLoadedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (!workspaceLoadedRef.current) return;
     lsSet(
       LS_WORKSPACE,
       JSON.stringify(
@@ -446,12 +417,10 @@ export default function App() {
   }, [font, paperSize, defaultGridCols, selectedStyleKey, stickers]);
 
   useEffect(() => {
-    if (!shelfLoadedRef.current) return;
     lsSet(LS_SHELF, JSON.stringify(savedCards));
   }, [savedCards]);
 
   useEffect(() => {
-    if (!templatesLoadedRef.current) return;
     lsSet(LS_TEMPLATES, JSON.stringify(templates));
   }, [templates]);
 

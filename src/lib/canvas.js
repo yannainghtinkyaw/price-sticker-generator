@@ -49,15 +49,20 @@ export function drawSticker(ctx, p, x, y, w, h, font) {
     fs--;
     ctx.font = `900 ${fs}px ${f}`;
   }
-  ctx.fillText(p.name, x + w / 2, y + h * 0.19);
+  ctx.fillStyle = p.nameColor || fg;
+  ctx.fillText(p.name, x + w / 2, y + h * 0.16);
 
   // Specs – bold for Classic cards; per-field custom colours
   const specWeight = p.classic ? '800' : '400';
   ctx.font = `${specWeight} 21px ${f}`;
+  if (p.ram) {
+    ctx.fillStyle = p.ramColor || fg;
+    ctx.fillText(`RAM ${p.ram} GB`, x + w / 2, y + h * 0.29);
+  }
   ctx.fillStyle = p.romColor || fg;
-  ctx.fillText(`Storage / ROM ${p.rom} GB`,   x + w / 2, y + h * 0.37);
+  ctx.fillText(`Storage / ROM ${p.rom} GB`, x + w / 2, p.ram ? y + h * 0.42 : y + h * 0.37);
   ctx.fillStyle = p.batteryColor || fg;
-  ctx.fillText(`${p.battery} mAh`,             x + w / 2, y + h * 0.51);
+  ctx.fillText(`${p.battery} mAh`, x + w / 2, p.ram ? y + h * 0.55 : y + h * 0.51);
   ctx.fillStyle = fg;
 
   // Price badge
@@ -77,6 +82,6 @@ export function drawSticker(ctx, p, x, y, w, h, font) {
   ctx.stroke();
 
   ctx.font = `900 44px ${f}`;
-  ctx.fillStyle = fg;
+  ctx.fillStyle = p.priceColor || fg;
   ctx.fillText(`${p.price}.-`, x + w / 2, by + bh / 2);
 }

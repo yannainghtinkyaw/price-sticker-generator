@@ -20,11 +20,11 @@ export const STYLE_CATALOG = [
 
 export const STYLE_EDITOR_CONFIGS = {
   classic: {
-    fields: ['name', 'rom', 'battery', 'price'],
+    fields: ['name', 'ram', 'rom', 'battery', 'price'],
     optionalFields: ['oldPrice'],
     behavior: ['ellipsis'],
     appearance: ['theme', 'filled'],
-    required: ['name', 'rom', 'battery', 'price'],
+    required: ['name', 'ram', 'rom', 'battery', 'price'],
   },
   L1: {
     fields: ['name', 'price'],
@@ -102,6 +102,7 @@ export const STYLE_EDITOR_CONFIGS = {
     behavior: ['has5g'],
     appearance: [],
     required: ['name', 'ram', 'rom', 'battery', 'camera', 'chip', 'display', 'price'],
+    images: ['imageFront', 'imageBack', 'imageSide'],
   },
 };
 
@@ -124,6 +125,9 @@ export const SAMPLE_STICKER_DATA = {
   classic: false,
   romColor: '',
   batteryColor: '',
+  ramColor: '',
+  nameColor: '',
+  priceColor: '',
 };
 
 function createId(prefix) {

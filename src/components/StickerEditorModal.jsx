@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { M, R, THEMES } from '../lib/constants.js';
 import { STYLE_CATALOG, clampGridCols, clampGridRows, createSticker, getStyleEditorConfig, getStyleMeta } from '../lib/stickerModel.js';
 import Field from './Field.jsx';
@@ -5,6 +6,90 @@ import Switch from './Switch.jsx';
 import StyleToggle from './StyleToggle.jsx';
 import PriceTagCard from './PriceTagCard.jsx';
 import StickerCard from './StickerCard.jsx';
+
+function compressImage(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 600;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          const s = MAX / Math.max(w, h);
+          w = Math.round(w * s);
+          h = Math.round(h * s);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function ImageUploadSlot({ label, value, onChange }) {
+  const ref = useRef(null);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: M.onSurfaceVar, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div
+        onClick={() => ref.current?.click()}
+        style={{
+          height: 120,
+          borderRadius: 12,
+          border: value ? 'none' : `1.5px dashed ${M.outline}`,
+          background: value ? 'transparent' : M.s2,
+          cursor: 'pointer',
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+        }}
+      >
+        {value ? (
+          <>
+            <img src={value} alt={label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <button
+              onClick={e => { e.stopPropagation(); onChange(''); }}
+              style={{
+                position: 'absolute', top: 4, right: 4,
+                width: 20, height: 20, borderRadius: 999,
+                background: 'rgba(0,0,0,0.55)', color: '#fff',
+                border: 'none', cursor: 'pointer',
+                fontSize: 11, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >×</button>
+          </>
+        ) : (
+          <div style={{ textAlign: 'center', color: M.onSurfaceVar }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ display: 'block', margin: '0 auto 4px' }}>
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <path d="M12 8v8M8 12h8" />
+            </svg>
+            <div style={{ fontSize: 10, fontWeight: 700 }}>Upload</div>
+          </div>
+        )}
+      </div>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={async e => {
+          const file = e.target.files?.[0];
+          if (file) onChange(await compressImage(file));
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+}
 
 export default function StickerEditorModal({
   open,
@@ -161,6 +246,17 @@ export default function StickerEditorModal({
           </div>
         </div>
 
+        {formStyleKey === 'L11' && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 }}>Product Images</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <ImageUploadSlot label="Back View" value={formData.imageBack} onChange={v => setFormData(d => ({ ...d, imageBack: v }))} />
+              <ImageUploadSlot label="Front View" value={formData.imageFront} onChange={v => setFormData(d => ({ ...d, imageFront: v }))} />
+              <ImageUploadSlot label="Side View" value={formData.imageSide} onChange={v => setFormData(d => ({ ...d, imageSide: v }))} />
+            </div>
+          </div>
+        )}
+
         {visibleAppearance.has('theme') && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: M.onSurfaceVar, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>Visual style</div>
@@ -191,6 +287,59 @@ export default function StickerEditorModal({
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, textTransform: 'uppercase', marginBottom: 10 }}>Sticker Style Fill</div>
           <StyleToggle value={formData.filled} onChange={value => setFormData(current => ({ ...current, filled: value }))} color={activeColor} />
+        </div>
+        )}
+
+        {formStyleKey === 'classic' && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: M.onSurfaceVar, textTransform: 'uppercase', marginBottom: 10 }}>Text Colors</div>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            {[
+              { colorKey: 'nameColor', label: 'Name' },
+              { colorKey: 'priceColor', label: 'Price' },
+              { colorKey: 'ramColor', label: 'RAM' },
+              { colorKey: 'romColor', label: 'ROM' },
+              { colorKey: 'batteryColor', label: 'Battery' },
+            ].map(({ colorKey, label }) => {
+              const currentColor = formData[colorKey];
+              return (
+                <div key={colorKey} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                  <label style={{ cursor: 'pointer', display: 'block' }}>
+                    <div style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: '50%',
+                      background: currentColor || '#e0e0e0',
+                      border: currentColor ? '3px solid #fff' : '2px dashed #bbb',
+                      boxShadow: currentColor ? `0 0 0 3px ${currentColor}` : '0 2px 6px rgba(0,0,0,0.1)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: 'all .15s',
+                    }}>
+                      <input
+                        type="color"
+                        value={currentColor || '#000000'}
+                        onChange={e => setFormData(v => ({ ...v, [colorKey]: e.target.value }))}
+                        style={{ position: 'absolute', opacity: 0, width: '200%', height: '200%', top: '-50%', left: '-50%', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </label>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: M.onSurfaceVar, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+                  {currentColor && (
+                    <button
+                      onClick={() => setFormData(v => ({ ...v, [colorKey]: '' }))}
+                      style={{ fontSize: 8, color: M.onSurfaceVar, background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                    >
+                      reset
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 10, color: M.onSurfaceVar, marginTop: 8 }}>
+            Leave unset to use the sticker color.
+          </div>
         </div>
         )}
 

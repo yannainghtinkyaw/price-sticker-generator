@@ -1,6 +1,9 @@
 export default function L0ClassicSimple({ phone, color, filled }) {
   const bg = filled ? `linear-gradient(145deg, ${color} 0%, ${color}CC 100%)` : '#fff';
   const fg = filled ? '#fff' : color;
+  const nameFg = phone.nameColor || fg;
+  const priceFg = phone.priceColor || fg;
+  const ramFg = phone.ramColor || fg;
   const romFg = phone.romColor || fg;
   const batteryFg = phone.batteryColor || fg;
 
@@ -9,7 +12,7 @@ export default function L0ClassicSimple({ phone, color, filled }) {
       style={{
         borderRadius: 14,
         height: '100%',
-        padding: '14px 12px 10px',
+        padding: '10px 12px 8px',
         background: bg,
         position: 'relative',
         overflow: 'hidden',
@@ -66,11 +69,11 @@ export default function L0ClassicSimple({ phone, color, filled }) {
         style={{
           fontWeight: 900,
           fontSize: 14,
-          color: fg,
+          color: nameFg,
           textAlign: 'center',
           lineHeight: 1.22,
-          marginBottom: 6,
-          marginTop: filled ? 12 : 8,
+          marginBottom: 3,
+          marginTop: filled ? 8 : 4,
           ...(phone.ellipsis
             ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }
             : {}),
@@ -79,15 +82,31 @@ export default function L0ClassicSimple({ phone, color, filled }) {
         {phone.name}
       </div>
 
+      {phone.ram && (
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: ramFg,
+            textAlign: 'center',
+            lineHeight: 1.2,
+            letterSpacing: 0.1,
+            marginBottom: 2,
+          }}
+        >
+          RAM {phone.ram} GB
+        </div>
+      )}
+
       <div
         style={{
           fontSize: 11,
           fontWeight: 800,
           color: romFg,
           textAlign: 'center',
-          lineHeight: 1.35,
+          lineHeight: 1.2,
           letterSpacing: 0.1,
-          marginBottom: 4,
+          marginBottom: 2,
         }}
       >
         Storage / ROM {phone.rom} GB
@@ -99,7 +118,7 @@ export default function L0ClassicSimple({ phone, color, filled }) {
           fontWeight: 800,
           color: batteryFg,
           textAlign: 'center',
-          lineHeight: 1.3,
+          lineHeight: 1.2,
           letterSpacing: 0.1,
         }}
       >
@@ -112,13 +131,13 @@ export default function L0ClassicSimple({ phone, color, filled }) {
           background: filled ? 'rgba(255,255,255,0.14)' : 'transparent',
           borderRadius: 10,
           marginTop: 'auto',
-          padding: '7px 0 6px',
+          padding: '5px 0',
           fontWeight: 900,
           fontSize: 18,
-          color: fg,
+          color: priceFg,
           textAlign: 'center',
           letterSpacing: -0.3,
-          minHeight: 40,
+          minHeight: 36,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
